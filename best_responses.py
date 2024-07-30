@@ -2,7 +2,8 @@ import numpy as np
 import cvxpy as cp
 from scipy.optimize import minimize
 from cost_functions import MixWeightedLinearSumSquareCostFunction
-
+from weightedsampler import *
+from sklearn.svm import LinearSVC
 
 class BestResponse:
     """Best response function for agents given classifier.
@@ -100,3 +101,20 @@ class BestResponse:
         differing_indices = np.where(differences)[0]
 
         return differing_indices
+
+    def algorithm4(self, X_train, y_train, sigma, m):
+        ws = WeightedSampler(X_train, sigma)
+        n=(self.X.shape[0])
+        y_pred_est=np.empty(n)
+        for ind, x in enumerate(self.X):
+            ind_c, T_c =ws.sample(x, m)
+            y_c=y_train[ind_c].reshape(m,1)
+
+            f_est=LinearSVC(dual=False)
+            f_est.fit(T_c, y_c)
+
+            y_pred_est[ind]=f_est.predict(x.reshape(-1, 1))
+
+        return(y_pred_est)
+
+

@@ -1,7 +1,7 @@
 import numpy as np
 
 class WeightedSampler:
-    def __init__(self, X, sigma):
+    def __init__(self, X_train, sigma):
         """
         Initializes the WeightedSampler with the population X and bandwidth parameter sigma.
 
@@ -9,7 +9,7 @@ class WeightedSampler:
         X (numpy array): The population from which to sample.
         sigma (float): The bandwidth parameter for the Gaussian kernel.
         """
-        self.X = X
+        self.X_train = X_train
         self.sigma = sigma
 
     def compute_distances(self, x):
@@ -22,7 +22,7 @@ class WeightedSampler:
         Returns:
         numpy array: The distances between x and each point in X.
         """
-        return np.linalg.norm(self.X - x, axis=1)
+        return np.linalg.norm(self.X_train - x, axis=1)
 
     def gaussian_weights(self, distances):
         """
@@ -62,8 +62,8 @@ class WeightedSampler:
         distances = self.compute_distances(x)
         weights = self.gaussian_weights(distances)
         probabilities = self.normalize_weights(weights)
-        indices = np.random.choice(len(self.X), size=num_samples, p=probabilities, replace=False)
-        return self.X[indices]
+        indices = np.random.choice(len(self.X_train), size=num_samples, p=probabilities, replace=False)
+        return indices, self.X_train[indices]
 
 
 class WeightedSampler2:
@@ -114,7 +114,7 @@ class WeightedSampler2:
         """
         return weights / np.sum(weights)
 
-    def sample(self, x, num_samples=1):
+    def sample(self, x, num_samples=1): # to do: include samples if only +1 or -1 was drawn
         """
         Samples instances from the population X with higher probability for instances near x.
 
@@ -123,32 +123,14 @@ class WeightedSampler2:
         num_samples (int): The number of samples to draw.
 
         Returns:
+        numpy array: The sampled indices
         numpy array: The sampled instances.
         """
         distances = self.compute_distances(x)
         weights = self.gaussian_weights(distances)
         probabilities = self.normalize_weights(weights)
         indices = np.random.choice(len(self.X), size=num_samples, p=probabilities, replace=False)
-        return self.X[indices]
+        print(indices)
+        return indices, self.X[indices]
 
-    def sample_all_negative(self, x_train, y_train_pred, num_samples=1):
-        """
-        Samples instances for all x_train instances that have a negative prediction in y_pred_shifted.
 
-        Parameters:
-        x_train (numpy array): The dataset from which to sample.
-        y_pred_shifted (numpy array): The shifted predictions corresponding to x_train.
-        num_samples (int): The number of samples to draw for each negative instance.
-
-        Returns:
-        list of numpy arrays: The sampled instances for each negative instance in x_train.
-        """
-        negative_indices = np.where(y_train_pred < 0)[0]
-        all_sampled_instances = []
-
-        for idx in negative_indices:
-            x = x_train[idx]
-            sampled_instances = self.sample(x, num_samples=num_samples)
-            all_sampled_instances.append(sampled_instances)
-
-        return all_sampled_instances
