@@ -117,4 +117,87 @@ class BestResponse:
 
         return(y_pred_est)
 
+class algorithm4:
+    def __init__(self, X_test, strat_features):
+        self.X = X_test
+        self.strat_features = strat_features
+
+    def sample_predict_shift_utility(self, X_train, y_train, sigma,m, alpha, t, eps, treshold):
+        ws = WeightedSampler(X_train, sigma)
+        n = (self.X.shape[0])
+        y_pred_est = np.empty(n)
+        y_pred_est_after = np.empty(n)
+        x_shifted = np.empty(n)
+        costs=np.empty(n)
+        for ind, x in enumerate(self.X):
+            ind_c, T_c = ws.sample(x, m)
+            y_c = y_train[ind_c].reshape(m, 1)
+
+            f_est = LinearSVC(dual=False)
+            f_est.fit(T_c, y_c)
+
+            y_pred_est[ind] = f_est.predict(x.reshape(-1, 1))
+
+            bestresponse_sample=BestResponse(x.reshape(-1, 1), self.strat_features)
+
+            x_shifted[ind] = bestresponse_sample.algorithm2(alpha, f_est, t, eps, mod_type="dec_f", treshold=treshold)
+
+            y_pred_est_after[ind]=f_est.predict(x_shifted[ind].reshape(-1, 1))
+
+            costs[ind]=bestresponse_sample.get_costs()
+
+        self.y_pred_est=np.copy(y_pred_est)
+        self.y_pred_est_after = np.copy(y_pred_est_after)
+        self.costs=np.copy(costs)
+        self.X_shifted=np.copy(x_shifted)
+
+        return self.X_shifted
+
+    def sample_predict_shift_imitation(self, X_train, y_train, sigma,m, beta, alpha, epsilon):
+        ws = WeightedSampler(X_train, sigma)
+        cost_func = MixWeightedLinearSumSquareCostFunction(alpha, epsilon)
+        n = (self.X.shape[0])
+
+        x_shifted = np.empty(n)
+        costs=np.empty(n)
+        for ind, x in enumerate(self.X):
+            ind_c, T_c = ws.sample(x, m)
+            y_c = y_train[ind_c].reshape(m, 1)
+
+            # finding +1 labeled samples:
+            ind_plus = np.where(y_c.flatten() == 1)[0]
+            T_c_plus = T_c[ind_plus]
+
+            x_p = T_c_plus.mean(axis=0)
+            x_shifted[ind]=beta*x+(1-beta)*x_p
+
+            costs[ind]=cost_func(x_shifted[ind], x)
+
+        self.costs=np.copy(costs)
+        self.X_shifted=np.copy(x_shifted)
+
+        return self.X_shifted
+
+    def get_costs(self):
+        # Returns the costs of feature change
+        return self.costs
+
+    def find_differences(self):
+        # Returns the indices of instances who changed their fetaures
+
+        # Compare the elements to find differences
+        differences = self.X != self.X_shifted
+
+        # Get the indices of the differing elements
+        differing_indices = np.where(differences)[0]
+
+        return differing_indices
+
+    def est_pred_before(self):
+        # Returns the estimated model outcome of the users before the shift
+        return self.y_pred_est
+
+    def est_pred_after(self):
+        # Returns the estimated model outcome of the users after the shift
+        return self.y_pred_est_after
 

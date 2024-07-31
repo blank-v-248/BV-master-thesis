@@ -114,7 +114,7 @@ class WeightedSampler2:
         """
         return weights / np.sum(weights)
 
-    def sample(self, x, num_samples=1): # to do: include samples if only +1 or -1 was drawn
+    def sample(self, x, num_samples=1): # TODO: include samples if only +1 or -1 was drawn
         """
         Samples instances from the population X with higher probability for instances near x.
 

@@ -88,9 +88,21 @@ sigma = 1.0  # Bandwidth parameter
 y_pred_estimation=bestresponse.algorithm4(x_train, y_train, sigma, 50)
 print(y_pred_estimation)
 
+alg4=algorithm4(x_test, strat_features)
+
+x_test_shifted2=alg4.sample_predict_shift_utility(x_train, y_train, sigma, 50, alpha, t, eps, treshold=0.5 )
+
+costs_31=alg4.get_costs()
 
 
+print()
+print(x_test_shifted2)
+print(x_test)
 
+# 3.2. NO INFORMATION - IMITATION
+x_test_shifted3=alg4.sample_predict_shift_imitation(x_train,y_train, sigma, 50, 0.1, alpha, eps)
+
+print(x_test_shifted3)
 
 
 
