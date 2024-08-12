@@ -64,22 +64,17 @@ class BestResponse:
                 # Solve the optimization problem with scipy minimize:
                 # Check if the optimization was successful
                 if result.success:
-                    print("succes")
                     opt_strat_x = result.x.reshape(1, m)
                 else:
-                    print("no succes")
                     opt_strat_x = x0_strat  # Retain the original x0_strat
                 print(opt_strat_x)
 
                 # Get the cost of optimal value:
                 self.costs[i] = cost_func(opt_strat_x, x0_strat)
-                print("cost", self.costs[i])
                 # Update X_strat based on the cost constraint: only change, if change does not cost too much
                 if self.costs[i]<2*t:
-                    print("smaller than", 2*t)
                     X_strat[i, self.strat_features] = opt_strat_x
                 else:
-                    print("not smaller than 2t")
                     self.costs[i] = 0
 
 

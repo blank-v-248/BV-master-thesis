@@ -1,34 +1,65 @@
 import numpy as np
-
 from sklearn.model_selection import train_test_split
 from sklearn.svm import LinearSVC
 from sklearn.metrics import accuracy_score
 from best_responses import *
 from lime.lime_tabular import LimeTabularExplainer
 from weightedsampler import *
+from sklearn.neural_network import MLPClassifier
+from sklearn.ensemble import RandomForestRegressor
+from sklearn import preprocessing
+from plotting import plot_orig_dataset
+
 
 # Generate 1D normally distributed data
 mean = 0  # Expected value (mean)
 variance = 1  # Variance
 size = 100  # Number of data points
-x = np.random.normal(mean, np.sqrt(variance), size).reshape(-1, 1)
+X = np.random.normal(mean, np.sqrt(variance), size).reshape(-1, 1)
+y = np.sign(X) # Assign labels based on the sign of x
+
+# Generate 2D cluster data
+num_points = 100
+np.random.seed(23)
+
+# Cluster 1 centered around (12, 180)
+cluster1_x1 = np.random.normal(12, 20, num_points)
+cluster1_x2 = np.random.normal(180, 90, num_points)
+cluster1_y = np.ones(num_points)  # Label 1
+
+# Cluster 2 centered around (55, 30)
+cluster2_x1 = np.random.normal(55, 20, num_points)
+cluster2_x2 = np.random.normal(30, 90, num_points)
+cluster2_y = np.zeros(num_points)  # Label 0
+
+# Concatenate data from both clusters
+x1 = np.concatenate([cluster1_x1, cluster2_x1])
+x2 = np.concatenate([cluster1_x2, cluster2_x2])
+y = np.concatenate([cluster1_y, cluster2_y])
+
+X = np.column_stack((x1, x2))
+std_scaler = preprocessing.StandardScaler()
+X = std_scaler.fit_transform(X)
 
 # Define parameters
-strat_features=np.array([0])
-alpha=np.array([1])
+strat_features=np.array([0, 1])
+alpha=np.array([1, 1]).reshape(2,1)
 t=2
 eps=1
-feature_names=["Feature1"]
-# Assign labels based on the sign of x
-y = np.sign(x)
+feature_names=["Feature1", "Feature2"]
+
 
 # Display the first 10 elements to verify
-print("First 10 elements of x:", x[:10])
+print("First 10 elements of X:", X[:10])
 print("First 10 elements of y:", y[:10])
 
 # Split the data into train and test sets with an 80-20% ratio
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.1, random_state=42)
+x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
 print(x_train.shape)
+
+# Plot original dataset:
+plot_orig_dataset(x_train, y_train, title="Original TRAINING data")
+plot_orig_dataset(x_test, y_test, title="Original TEST data")
 
 # Train a linear classifier on the data
 f = LinearSVC(dual=False)
@@ -112,6 +143,12 @@ print(x_test_shifted3)
 
 # 2. PARTIAL INFORMATION
 
+f = LinearSVC(dual=False)
+f.fit(x_train, y_train)
+
+f2=MLPClassifier(hidden_layer_sizes=(50,10))
+f2.fit(x_train, y_train)
+
 # Create a LIME explainer
 explainer = LimeTabularExplainer(
     training_data=x_train,
@@ -120,19 +157,20 @@ explainer = LimeTabularExplainer(
     mode='classification'
 )
 
-def predict_proba(X):
+def predict_proba_linSVC(X):
     decision = f.decision_function(X)
     expit = lambda x: 1 / (1 + np.exp(-x))
     proba = np.apply_along_axis(expit, 0, decision)
     return np.column_stack([1-proba, proba]) if proba.ndim == 1 else proba
 
+haha=predict_proba_linSVC(x_train[0].reshape(-1, 1))
+hihi=f.decision_function(x_train[0].reshape(-1, 1))
+
+
 # Explain the first instance
 exp = explainer.explain_instance(
     data_row=x_train[0],
-    predict_fn=predict_proba
+    predict_fn=predict_proba_linSVC
 )
 
-predict_proba(x_train[0].reshape(-1, 1))
-f.decision_function(x_train[0].reshape(-1, 1))
-# Print the explanation
-print(exp.as_list())
+
