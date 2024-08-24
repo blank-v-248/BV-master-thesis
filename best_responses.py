@@ -64,7 +64,7 @@ class BestResponse:
                 # Solve the optimization problem with scipy minimize:
                 # Check if the optimization was successful
                 if result.success:
-                    opt_strat_x = result.x.reshape(1, m)
+                    opt_strat_x = result.x #.reshape(1, m)
                 else:
                     opt_strat_x = x0_strat  # Retain the original x0_strat
                 print(opt_strat_x)

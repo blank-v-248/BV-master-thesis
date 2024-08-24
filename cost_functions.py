@@ -47,9 +47,10 @@ class MixWeightedLinearSumSquareCostFunction(CostFunction):
         self.epsilon = epsilon
 
     def __call__(self, z: np.array, x: np.array):
-        cost_value = (1 - self.epsilon) * self.a @ (z - x) + self.epsilon * np.sum((z - x) ** 2)
-        print("hihi")
-        print((1 - self.epsilon) * self.a.T @ (z - x))
-        print(self.epsilon * np.sum((z - x) ** 2))
-        return max(cost_value, 0)
+        dim =z.shape[0]
+        if dim != 1:
+            cost_value = (1 - self.epsilon) * self.a.T @ (z - x) + self.epsilon * np.sum((z - x) ** 2)
+        else:
+            cost_value = (1 - self.epsilon) * self.a @ (z - x) + self.epsilon * np.sum((z - x) ** 2)
+        return max(cost_value[0], 0)
 

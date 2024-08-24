@@ -116,8 +116,8 @@ print("User welfare after shift:", user_welfare_shift1, "%")
 x = x_train[0]  # Given datapoint
 sigma = 1.0  # Bandwidth parameter
 
-y_pred_estimation=bestresponse.algorithm4(x_train, y_train, sigma, 50)
-print(y_pred_estimation)
+#y_pred_estimation=bestresponse.algorithm4(x_train, y_train, sigma, 50)
+#print(y_pred_estimation)
 
 alg4=algorithm4(x_test, strat_features)
 
