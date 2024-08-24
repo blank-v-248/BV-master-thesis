@@ -108,7 +108,7 @@ class BestResponse:
             f_est=LinearSVC(dual=False)
             f_est.fit(T_c, y_c)
 
-            y_pred_est[ind]=f_est.predict(x.reshape(-1, 1))
+            y_pred_est[ind]=f_est.predict(x.reshape(1, -1))
 
         return(y_pred_est)
 
@@ -120,9 +120,10 @@ class algorithm4:
     def sample_predict_shift_utility(self, X_train, y_train, sigma,m, alpha, t, eps, treshold):
         ws = WeightedSampler(X_train, sigma)
         n = (self.X.shape[0])
+        dim = (self.X.shape[1])
         y_pred_est = np.empty(n)
         y_pred_est_after = np.empty(n)
-        x_shifted = np.empty(n)
+        x_shifted = np.empty([n,dim])
         costs=np.empty(n)
         for ind, x in enumerate(self.X):
             ind_c, T_c = ws.sample(x, m)
@@ -131,13 +132,15 @@ class algorithm4:
             f_est = LinearSVC(dual=False)
             f_est.fit(T_c, y_c)
 
-            y_pred_est[ind] = f_est.predict(x.reshape(-1, 1))
+            y_pred_est[ind] = f_est.predict(x.reshape(1, -1))
 
-            bestresponse_sample=BestResponse(x.reshape(-1, 1), self.strat_features)
+            bestresponse_sample=BestResponse(x.reshape(1, -1), self.strat_features)
 
-            x_shifted[ind] = bestresponse_sample.algorithm2(alpha, f_est, t, eps, mod_type="dec_f", treshold=treshold)
+            x_try = bestresponse_sample.algorithm2(alpha, f_est, t, eps, mod_type="dec_f", treshold=treshold)
 
-            y_pred_est_after[ind]=f_est.predict(x_shifted[ind].reshape(-1, 1))
+            x_shifted[ind,]=x_try[0]
+
+            y_pred_est_after[ind]=f_est.predict(x_shifted[ind].reshape(1, -1))
 
             costs[ind]=bestresponse_sample.get_costs()
 
@@ -164,7 +167,7 @@ class algorithm4:
             T_c_plus = T_c[ind_plus]
 
             x_p = T_c_plus.mean(axis=0)
-            x_shifted[ind]=beta*x+(1-beta)*x_p
+            x_shifted[ind, ]=beta*x+(1-beta)*x_p
 
             costs[ind]=cost_func(x_shifted[ind], x)
 

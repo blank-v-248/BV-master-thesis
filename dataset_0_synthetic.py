@@ -8,7 +8,7 @@ from weightedsampler import *
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestRegressor
 from sklearn import preprocessing
-from plotting import plot_orig_dataset
+from plotting import *
 
 
 # Generate 1D normally distributed data
@@ -48,7 +48,6 @@ t=2
 eps=1
 feature_names=["Feature1", "Feature2"]
 
-
 # Display the first 10 elements to verify
 print("First 10 elements of X:", X[:10])
 print("First 10 elements of y:", y[:10])
@@ -58,12 +57,18 @@ x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_
 print(x_train.shape)
 
 # Plot original dataset:
-plot_orig_dataset(x_train, y_train, title="Original TRAINING data")
-plot_orig_dataset(x_test, y_test, title="Original TEST data")
+plotter1=ClassifierPlotter(x_train, y_train)
+plotter1.plot_orig_dataset(title="Original TRAINING data")
+plotter2=ClassifierPlotter(x_test, y_test)
+plotter2.plot_orig_dataset(title="Original TEST data")
 
 # Train a linear classifier on the data
 f = LinearSVC(dual=False)
 f.fit(x_train, y_train)
+
+# Plot the decision surface
+plotter1.plot_decision_surface(f, title="Original TRAINING data with linear SVC decision boundary")
+plotter2.plot_decision_surface(f, title="Original TRAINING data with linear SVC decision boundary")
 
 #  Extract and save the coefficient weights to w_f
 w_f = f.coef_
