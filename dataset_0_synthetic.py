@@ -2,8 +2,12 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.svm import LinearSVC
 from sklearn.metrics import accuracy_score
+
+
+import best_responses
 from best_responses import *
-from lime.lime_tabular import LimeTabularExplainer
+
+
 from weightedsampler import *
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestRegressor
@@ -58,17 +62,19 @@ print(x_train.shape)
 
 # Plot original dataset:
 plotter1=ClassifierPlotter(x_train, y_train)
-plotter1.plot_orig_dataset(title="Original TRAINING data")
+#plotter1.plot_orig_dataset(title="Original TRAINING data")
 plotter2=ClassifierPlotter(x_test, y_test)
-plotter2.plot_orig_dataset(title="Original TEST data")
+#plotter2.plot_orig_dataset(title="Original TEST data")
 
 # Train a linear classifier on the data
 f = LinearSVC(dual=False)
 f.fit(x_train, y_train)
 
+f.decision_function(x_test)
+
 # Plot the decision surface
-plotter1.plot_decision_surface(f, title="Original TRAINING data with linear SVC decision boundary")
-plotter2.plot_decision_surface(f, title="Original TRAINING data with linear SVC decision boundary")
+#plotter1.plot_decision_surface(f, title="Original TRAINING data with linear SVC decision boundary")
+#plotter2.plot_decision_surface(f, title="Original TEST data with linear SVC decision boundary")
 
 #  Extract and save the coefficient weights to w_f
 w_f = f.coef_
@@ -87,7 +93,9 @@ print("Test accuracy:", test_accuracy)
 
 # 1. FULL INFORMATION
 bestresponse=BestResponse(x_test, strat_features)
-x_test_shifted1 = bestresponse.algorithm2(alpha, f, t, eps, mod_type="dec_f", treshold=0.5)
+x_test_shifted1 = bestresponse.algorithm2(alpha, f, t, eps, mod_type="dec_f", treshold=0)
+
+plotter2.plot_decision_surface(f, title="Shifted TEST data with linear SVC decision boundary", X_shifted=x_test_shifted1)
 
 ## check people who changed:
 x_changes=bestresponse.find_differences()
@@ -127,6 +135,7 @@ sigma = 1.0  # Bandwidth parameter
 alg4=algorithm4(x_test, strat_features)
 
 x_test_shifted2=alg4.sample_predict_shift_utility(x_train, y_train, sigma, 50, alpha, t, eps, treshold=0.5 )
+plotter2.plot_decision_surface(f, title="3 TEST data with linear SVC decision boundary", X_shifted=x_test_shifted2)
 
 costs_31=alg4.get_costs()
 
@@ -137,14 +146,9 @@ print(x_test)
 
 # 3.2. NO INFORMATION - IMITATION
 x_test_shifted3=alg4.sample_predict_shift_imitation(x_train,y_train, sigma, 50, 0.1, alpha, eps)
+plotter2.plot_decision_surface(f, title="Shifted3 TEST data with linear SVC decision boundary", X_shifted=x_test_shifted3)
 
 print(x_test_shifted3)
-
-
-
-
-
-
 
 # 2. PARTIAL INFORMATION
 
@@ -155,27 +159,16 @@ f2=MLPClassifier(hidden_layer_sizes=(50,10))
 f2.fit(x_train, y_train)
 
 # Create a LIME explainer
-explainer = LimeTabularExplainer(
-    training_data=x_train,
-    feature_names=['feature_1'],
-    class_names=['class_0', 'class_1'],
-    mode='classification'
-)
+Lime=best_responses.LimeFeatureChanger(x_train, x_test[3:4, ], strat_features)
 
-def predict_proba_linSVC(X):
-    decision = f.decision_function(X)
-    expit = lambda x: 1 / (1 + np.exp(-x))
-    proba = np.apply_along_axis(expit, 0, decision)
-    return np.column_stack([1-proba, proba]) if proba.ndim == 1 else proba
-
-haha=predict_proba_linSVC(x_train[0].reshape(-1, 1))
-hihi=f.decision_function(x_train[0].reshape(-1, 1))
+exp=Lime.explainer(f, 0.8, alpha, eps)
+print(exp)
 
 
-# Explain the first instance
-exp = explainer.explain_instance(
-    data_row=x_train[0],
-    predict_fn=predict_proba_linSVC
-)
+
+
+
+
+
 
 
