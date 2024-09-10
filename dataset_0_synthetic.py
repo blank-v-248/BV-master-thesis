@@ -87,6 +87,7 @@ train_accuracy = accuracy_score(y_train, y_train_pred)
 test_accuracy = accuracy_score(y_test, y_test_pred)
 
 # Display the coefficient weights
+print("--Original model--")
 print("Coefficient weights w_f:", w_f)
 print("Training accuracy:", train_accuracy)
 print("Test accuracy:", test_accuracy)
@@ -100,11 +101,10 @@ plotter2.plot_decision_surface(f, title="Shifted TEST data with linear SVC decis
 ## check people who changed:
 x_changes=bestresponse.find_differences()
 costs2 = bestresponse.get_costs()
-print(costs2)
 
 ## new labels by the model and ground truth:
 y_test_pred_shifted1=f.predict(x_test_shifted1)
-y_test_shifted1=np.sign(x_test_shifted1)
+y_test_shifted1=np.sign(x_test_shifted1) # TO-DO: make ground truth function
 
 ## Accuracy after shift:
 test_accuracy_shift1 = accuracy_score(y_test, y_test_pred_shifted1)
@@ -119,9 +119,10 @@ print("Accuracy before the shift:", test_accuracy*100, "%")
 print("Social welfare before shift:", social_welfare, "%")
 print("User welfare before shift:", user_welfare, "%")
 print("--")
+print("--1. Full information shift--")
 print("Number of users who changed:", len(x_changes))
 print("Accuracy after the shift:", test_accuracy_shift1*100, "%")
-print("Social welfare after shift:", social_welfare_shift1, "%")
+#print("Social welfare after shift:", social_welfare_shift1, "%")
 print("User welfare after shift:", user_welfare_shift1, "%")
 
 
@@ -129,28 +130,46 @@ print("User welfare after shift:", user_welfare_shift1, "%")
 x = x_train[0]  # Given datapoint
 sigma = 1.0  # Bandwidth parameter
 
-#y_pred_estimation=bestresponse.algorithm4(x_train, y_train, sigma, 50)
-#print(y_pred_estimation)
-
 alg4=algorithm4(x_test, strat_features)
 
 x_test_shifted2=alg4.sample_predict_shift_utility(x_train, y_train, sigma, 50, alpha, t, eps, treshold=0.5 )
 plotter2.plot_decision_surface(f, title="3 TEST data with linear SVC decision boundary", X_shifted=x_test_shifted2)
 
-costs_31=alg4.get_costs()
+x_changes2=alg4.find_differences()
+costs2 = alg4.get_costs()
+
+y_test_pred_shifted2=f.predict(x_test_shifted2)
+user_welfare_shift2=np.sum(y_test_pred_shifted2 == 1) / len(y_test_pred_shifted2) * 100
+test_accuracy_shift2 = accuracy_score(y_test, y_test_pred_shifted2)
+
+print("--")
+print("--3.1. No information, utility maximalization--")
+print("Number of users who changed:", len(x_changes2))
+print("Accuracy after the shift:", test_accuracy_shift2*100, "%")
+#print("Social welfare after shift:", social_welfare_shift1, "%")
+print("User welfare after shift:", user_welfare_shift2, "%")
 
 
-print()
-print(x_test_shifted2)
-print(x_test)
 
 # 3.2. NO INFORMATION - IMITATION
 x_test_shifted3=alg4.sample_predict_shift_imitation(x_train,y_train, sigma, 50, 0.1, alpha, eps)
 plotter2.plot_decision_surface(f, title="Shifted3 TEST data with linear SVC decision boundary", X_shifted=x_test_shifted3)
 
-print(x_test_shifted3)
+x_changes3=alg4.find_differences()
+costs3 = alg4.get_costs()
 
-# 2. PARTIAL INFORMATION
+y_test_pred_shifted3=f.predict(x_test_shifted3)
+user_welfare_shift3=np.sum(y_test_pred_shifted3 == 1) / len(y_test_pred_shifted3) * 100
+test_accuracy_shift3 = accuracy_score(y_test, y_test_pred_shifted3)
+
+print("--")
+print("--3.2. No information, imitation--")
+print("Number of users who changed:", len(x_changes3))
+print("Accuracy after the shift:", test_accuracy_shift3*100, "%")
+#print("Social welfare after shift:", social_welfare_shift1, "%")
+print("User welfare after shift:", user_welfare_shift3, "%")
+
+# 2. PARTIAL INFORMATION - LIME - in work
 
 f = LinearSVC(dual=False)
 f.fit(x_train, y_train)

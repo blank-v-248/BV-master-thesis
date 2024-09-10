@@ -130,7 +130,6 @@ class WeightedSampler2:
         weights = self.gaussian_weights(distances)
         probabilities = self.normalize_weights(weights)
         indices = np.random.choice(len(self.X), size=num_samples, p=probabilities, replace=False)
-        print(indices)
         return indices, self.X[indices]
 
 

@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 #Reference: https://github.com/staretgicclfdark/strategic_rep
 
-class CostFunction(ABC): # why is this needed???
+class CostFunction(ABC):
     @abstractmethod
     def __call__(self, z: np.array, x: np.array):
         '''
