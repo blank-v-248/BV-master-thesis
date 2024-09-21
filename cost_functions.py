@@ -1,8 +1,7 @@
 import numpy as np
-import cvxpy as cp
 from abc import ABC, abstractmethod
 
-#Reference: https://github.com/staretgicclfdark/strategic_rep
+#Source: https://github.com/staretgicclfdark/strategic_rep
 
 class CostFunction(ABC):
     @abstractmethod
@@ -50,7 +49,7 @@ class MixWeightedLinearSumSquareCostFunction(CostFunction):
         dim =x.shape[0]
         if dim != 1:
             cost_value = (1 - self.epsilon) * self.a.T @ (z - x) + self.epsilon * np.sum((z - x) ** 2)
-        else:
+        else: # if data dimension is 1, different syntax has to be used
             cost_value = (1 - self.epsilon) * self.a @ (z - x) + self.epsilon * np.sum((z - x) ** 2)
         return max(cost_value[0], 0)
 
