@@ -14,6 +14,6 @@ The main components include cost functions, plotting utilities, and modified reg
 
 - **plotting.py**: Includes functions for visualizing results, helping to interpret the outcomes of the simulations and algorithms.
 
-- **ridge.py**: Contains a modified version of the ridge regression algorithm, tailored to fit the requirements of the project and accommodate version control.
+- **ridge.py**: Contains a modified version of the ridge regression algorithm, tailored because of version control issues.
 
 - **weightedsampler.py**: Implements a weighted sampling method designed for scenarios with no information cases, as described in section 3.2.III of the project documentation.
