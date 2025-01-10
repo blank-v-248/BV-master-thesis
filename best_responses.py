@@ -1,3 +1,5 @@
+# TO-DO: apply strategic features everywhere!
+
 import numpy as np
 from scipy.optimize import minimize
 from cost_functions import MixWeightedLinearSumSquareCostFunction
@@ -25,7 +27,7 @@ def difference_finder(X0, X1):
     # Get the indices of the differing elements
     differing_indices = np.where(differences)
 
-    return differing_indices
+    return differing_indices[0].tolist()
 
 class Fullinformation:
     """Best response function for agents given classifier in a full information scenario.
@@ -58,8 +60,7 @@ class Fullinformation:
 
         for i in range(n): #iterate over all instances
             if model.predict(X_strat[i,].reshape(1, -1)) != 1:  # people only change, if they get predicted as -1
-                x0_strat = X_strat[
-                    i, self.strat_features]  # these are the features that agent can change
+                x0_strat = X_strat[i, self.strat_features]  # these are the features that agent can change
 
                 # Define the cost function by class:
                 cost_func = MixWeightedLinearSumSquareCostFunction(alpha, epsilon)
@@ -94,12 +95,11 @@ class Fullinformation:
                 # Get the cost of optimal value:
                 self.costs[i] = cost_func(opt_strat_x, x0_strat)
 
-                # Update X_strat based on the cost constraint: only change, if change does not costly feasible
+                # Update X_strat based on the cost constraint: only change, if change does not too costly = feasible
                 if self.costs[i]<2*t:
                     X_strat[i, self.strat_features] = opt_strat_x
                 else:
                     self.costs[i] = 0
-
 
                 self.X_shifted=np.copy(X_strat)
 
@@ -125,7 +125,7 @@ class NoInformation:
         self.eps=eps
 
     def algorithm4_utility(self, X_train, y_train_pred, sigma,m, t, threshold):
-        ws = WeightedSampler(X_train, sigma) # initialize weighted sampler
+        ws = WeightedSampler(X_train, sigma, y_train_pred) # initialize weighted sampler
         n = (self.X.shape[0])
         dim = (self.X.shape[1])
 
@@ -189,13 +189,13 @@ class NoInformation:
             return min(beta_1, 1)
 
     def algorithm4_imitation(self, X_train, y_train_pred, sigma,m, t):
-        ws = WeightedSampler(X_train, sigma)
+        ws = WeightedSampler(X_train, sigma, y_train_pred)
         cost_func = MixWeightedLinearSumSquareCostFunction(self.alpha, self.eps)
         n = (self.X.shape[0])
 
         x_shifted = np.empty((self.X.shape))
-        costs=np.empty(n)
-        for ind, x in enumerate(self.X): # TO-DO: choose beta based on the costs being 2t
+        costs=[]
+        for ind, x in enumerate(self.X):
             ind_c, T_c = ws.sample(x, m) #users take a sample from X_train
             y_c = y_train_pred[ind_c].reshape(m, 1) #users get the models decision on that sample
 
@@ -208,9 +208,7 @@ class NoInformation:
             beta_star=self.compute_beta(x, x_p, t)
             x_shifted[ind, ]=beta_star*x+(1-beta_star)*x_p #shift into users direction
 
-            costs[ind]=cost_func(x_shifted[ind], x)
-            if costs[ind]!=2*t:
-                print("The cost is not 2T!", costs[ind], 2*t)
+            costs.append(cost_func(x_shifted[ind], x))
 
         self.costs=np.copy(costs)
         self.X_shifted=np.copy(x_shifted)
@@ -222,13 +220,9 @@ class NoInformation:
         return self.costs
 
     def find_differences(self):
-        # Returns the indices of instances who changed their fetaures
-
-        # Compare the elements to find differences
-        differences = self.X != self.X_shifted
 
         # Get the indices of the differing elements
-        differing_indices = np.where(differences)[0]
+        differing_indices =  difference_finder(self.X, self.X_shifted)
 
         return differing_indices
 
@@ -245,6 +239,11 @@ class PartialInformation:
         self.X_train = x_train
         self.X_test=x_test
         self.strat_features = strat_features
+
+        # create arrays to store results
+        self.y_pred_est = []
+        self.y_pred_est_after = []
+        self.costs=[]
 
     def parse_lime_output(self, exp_list, margin=0.001):
         """
@@ -298,7 +297,7 @@ class PartialInformation:
 
         return parsed_output
 
-    def algorithm3(self, f, threshold, alpha, epsilon, budget=10):
+    def algorithm3(self, f, threshold, alpha, epsilon, budget=2):
         explainer = LimeTabularExplainer( # A lime explainer is trained on X_train
             training_data=self.X_train,
             feature_names=list(range(self.X_train.shape[1])),
@@ -322,6 +321,8 @@ class PartialInformation:
             exp_values = exp.as_list() #export explanation values
             loc_prob =exp.local_pred # export probability of prediction of LIME
 
+            self.y_pred_est.append(0 if loc_prob < threshold else 1)
+
             if loc_prob<threshold: # if the probability of being a +1 is smaller than a threshold, then shift:
                 exp_vector = self.parse_lime_output(exp_values) # parse the LIME values
                 exp_filt = [ # filter only values that decline the probability of being a +1
@@ -333,8 +334,9 @@ class PartialInformation:
                 if len(exp_sorted) == 0: # if there are no such features, user does not change
                     continue
 
-                # initialize total costs
+                # initialize total costs and new probability as old probability
                 cost_cum = 0
+                new_exp_loc_prob = loc_prob
 
                 for j in range(len(exp_sorted)): #go over every feature that could improve classifiction to a +1
                     # Split LIME output:
@@ -342,9 +344,17 @@ class PartialInformation:
                     Z_low = exp_sorted[j][1]
                     Z_up = exp_sorted[j][2]
 
-                    # Check costs for increasing or decreasing feature TO-DO: what to do if one is None?
-                    cost_low = cost_func(np.atleast_1d(self.X_test[i, feat]), np.atleast_1d(Z_low))
-                    cost_up = cost_func(np.atleast_1d(self.X_test[i, feat]), np.atleast_1d(Z_up))
+                    # Check costs for increasing or decreasing feature
+                    if Z_low is None:
+                        cost_low = np.inf
+                    else:
+                        cost_low = cost_func(np.atleast_1d(self.X_test[i, feat]), np.atleast_1d(Z_low))
+
+                    if Z_up is None:
+                        cost_up = np.inf
+                    else:
+                        cost_up = cost_func(np.atleast_1d(self.X_test[i, feat]), np.atleast_1d(Z_up))
+
                     if min(cost_low, cost_up) < budget - cost_cum: # if at least one is feasible, make a change
                         # choose the cheaper change
                         if cost_low<cost_up:
@@ -354,10 +364,36 @@ class PartialInformation:
                             delta_L[i, feat] = Z_up
                             cost_cum += cost_up
                         # Check if the prediction is already positive:
-                        new_exp_loc_prob = explainer.explain_instance(data_row=delta_L[i, feat], predict_fn=predict_proba_linSVC).loc_pred
+                        new_exp_loc_prob = explainer.explain_instance(data_row=delta_L[i,], predict_fn=predict_proba_linSVC).local_pred
                         if new_exp_loc_prob >= threshold: # if it is positive, the user does not change anymore features
                             continue
+                self.costs.append(cost_cum)
+                self.y_pred_est_after.append(0 if new_exp_loc_prob < threshold else 1)
+            else: # no change happening
+                self.costs.append(0)
+                self.y_pred_est_after.append(0 if loc_prob < threshold else 1)
+        self.X_shifted=np.copy(delta_L)
         return delta_L
+
+    def get_costs(self):
+        # Returns the costs of feature change
+        return self.costs
+
+    def find_differences(self):
+        # Returns the indices of instances who changed their fetaures
+
+        # Get the indices of the differing elements
+        differing_indices = difference_finder(self.X_test, self.X_shifted)
+
+        return differing_indices
+
+    def est_pred_before(self):
+        # Returns the estimated model outcome of the users before the shift
+        return self.y_pred_est
+
+    def est_pred_after(self):
+        # Returns the estimated model outcome of the users after the shift
+        return self.y_pred_est_after
 
 
 

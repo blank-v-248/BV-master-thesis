@@ -1,7 +1,10 @@
+# NO IMPROVEMENT IS ALLOWED YET/NO GROUND TRUTH
+
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import argparse
+import pandas as pd
 
 from best_responses import *
 from plotting import *
@@ -9,6 +12,12 @@ from dataset_load import *
 
 from weightedsampler import *
 from sklearn.neural_network import MLPClassifier
+
+import warnings
+from sklearn.exceptions import DataConversionWarning
+
+# Suppress the specific warning
+warnings.filterwarnings(action='ignore', category=DataConversionWarning)
 
 def main(
     dimension_number: int
@@ -18,7 +27,7 @@ def main(
     strat_features = np.array([0, 1])
     alpha = np.array([1, 1]).reshape(2, 1)
     t = 2
-    eps = 1
+    eps = 0.8
     feature_names = ["Feature1", "Feature2"]
 
     x_train, x_test, y_train, y_test = synth_data(dimensions=dimension_number, random_seed=42)
@@ -59,18 +68,19 @@ def main(
     print("Test accuracy:", test_accuracy)
 
     # 1. FULL INFORMATION
-    bestresponse=Fullinformation(x_test, strat_features)
+    bestresponse=Fullinformation(x_test, strat_features.tolist())
     x_test_shifted1 = bestresponse.algorithm2(alpha, f, t, eps, mod_type="dec_f", threshold=0)
 
     plotter2.plot_decision_surface(f, title="1: Full information TEST data with linear SVC decision boundary", X_shifted=x_test_shifted1)
 
     ## check people who changed:
     x_changes=bestresponse.find_differences()
-    costs2 = bestresponse.get_costs()
+    costs = bestresponse.get_costs()
+    avg_cost = np.sum(costs) / len(x_changes)
 
     ## new labels by the model:
     y_test_pred_shifted1=f.predict(x_test_shifted1)
-    #y_test_shifted1=np.sign(x_test_shifted1)  TO-DO: make ground truth function
+    avg_cont_payoff = np.sum(t * y_test_pred_shifted1 - costs) / len(y_test_pred_shifted1)
 
     ## Accuracy after shift:
     test_accuracy_shift1 = accuracy_score(y_test, y_test_pred_shifted1)
@@ -88,54 +98,13 @@ def main(
     print("User welfare before shift:", user_welfare, "%")
     print("--")
     print("--1. Full information shift--")
-    print("Number of users who changed:", len(x_changes))
+    print("Number of users who changed:", len(x_changes), " in %:", len(x_changes)/len(x_test)*100, "%")
+    print("Average cost of change: ", avg_cost)
     print("Accuracy after the shift:", test_accuracy_shift1*100, "%")
     #print("Social welfare after shift:", social_welfare_shift1, "%")
     print("User welfare after shift:", user_welfare_shift1, "%")
 
-
-    # 3.1. NO INFORMATION - UTILITY MAXIMIZATION
-    sigma = 1.0  # Bandwidth parameter for weigthed sampling
-
-    alg4=NoInformation(x_test, strat_features, alpha,  eps)
-
-    x_test_shifted2=alg4.algorithm4_utility(x_train, y_train_pred, sigma, 50, t, threshold=0.5 )
-    plotter2.plot_decision_surface(f, title="3.1. No information estimation TEST data with linear SVC decision boundary", X_shifted=x_test_shifted2)
-
-    x_changes2=alg4.find_differences()
-    costs2 = alg4.get_costs()
-
-    y_test_pred_shifted2=f.predict(x_test_shifted2)
-    user_welfare_shift2=np.sum(y_test_pred_shifted2 == 1) / len(y_test_pred_shifted2) * 100
-    test_accuracy_shift2 = accuracy_score(y_test, y_test_pred_shifted2)
-
-    print("--")
-    print("--3.1. No information, utility maximalization--")
-    print("Number of users who changed:", len(x_changes2))
-    print("Accuracy after the shift:", test_accuracy_shift2*100, "%")
-    #print("Social welfare after shift:", social_welfare_shift1, "%")
-    print("User welfare after shift:", user_welfare_shift2, "%")
-
-
-    # 3.2. NO INFORMATION - IMITATION
-    x_test_shifted3=alg4.algorithm4_imitation(x_train,y_train_pred, sigma, 50, t)
-    plotter2.plot_decision_surface(f, title="3.2. No information imitation TEST data with linear SVC decision boundary", X_shifted=x_test_shifted3)
-
-    x_changes3=alg4.find_differences()
-    costs3 = alg4.get_costs()
-
-    y_test_pred_shifted3=f.predict(x_test_shifted3)
-    user_welfare_shift3=np.sum(y_test_pred_shifted3 == 1) / len(y_test_pred_shifted3) * 100
-    test_accuracy_shift3 = accuracy_score(y_test, y_test_pred_shifted3)
-
-    print("--")
-    print("--3.2. No information, imitation--")
-    print("Number of users who changed:", len(x_changes3))
-    print("Accuracy after the shift:", test_accuracy_shift3*100, "%")
-    #print("Social welfare after shift:", social_welfare_shift1, "%")
-    print("User welfare after shift:", user_welfare_shift3, "%")
-
-    # 2. PARTIAL INFORMATION - LIME - in work
+    # 2. PARTIAL INFORMATION - LIME
 
     f = LinearSVC(dual=False)
     f.fit(x_train, y_train)
@@ -144,10 +113,104 @@ def main(
     f2.fit(x_train, y_train)
 
     # Create a LIME explainer
-    Lime=PartialInformation(x_train, x_test[3:4, ], strat_features)
+    Lime=PartialInformation(x_train, x_test, strat_features)
 
-    exp=Lime.algorithm3(f, 0.8, alpha, eps)
-    print(exp)
+    x_test_shifted2=Lime.algorithm3(f, 0.4, alpha, eps)
+
+    plotter2.plot_decision_surface(f, title="2: Partial information TEST data with linear SVC decision boundary",
+                                   X_shifted=x_test_shifted2)
+
+    x_changes2 = Lime.find_differences()
+    costs2 = Lime.get_costs()
+    avg_cost2=np.sum(costs2)/len(x_changes2)
+
+    y_test_pred_shifted2 = f.predict(x_test_shifted2)
+    user_welfare_shift2 = np.sum(y_test_pred_shifted2 == 1) / len(y_test_pred_shifted2) * 100
+    test_accuracy_shift2 = accuracy_score(y_test, y_test_pred_shifted2)
+
+    avg_cont_payoff2=np.sum(t*y_test_pred_shifted2-costs2)/len(y_test_pred_shifted2)
+
+    print("--")
+    print("--2. Partial information--")
+    print("Number of users who changed:", len(x_changes2), " in %:", len(x_changes2)/len(x_test)*100, "%")
+    print("Average cost of change: ", avg_cost2)
+    print("Accuracy after the shift:", test_accuracy_shift2*100, "%")
+    #print("Social welfare after shift:", social_welfare_shift1, "%")
+    print("User welfare after shift:", user_welfare_shift2, "%")
+    print("Average contestant payoff:", avg_cont_payoff2)
+
+
+    # 3.1. NO INFORMATION - UTILITY MAXIMIZATION
+    sigma = 1.0  # Bandwidth parameter for weigthed sampling
+
+    alg4=NoInformation(x_test, strat_features, alpha,  eps)
+
+    x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, 50, t, threshold=0.5 )
+    plotter2.plot_decision_surface(f, title="3.1. No information estimation TEST data with linear SVC decision boundary", X_shifted=x_test_shifted3)
+
+    x_changes3=alg4.find_differences()
+    costs3 = alg4.get_costs()
+    avg_cost3 = np.sum(costs3) / len(x_changes3)
+
+    y_test_pred_shifted3=f.predict(x_test_shifted3)
+    user_welfare_shift3=np.sum(y_test_pred_shifted3 == 1) / len(y_test_pred_shifted3) * 100
+    test_accuracy_shift3 = accuracy_score(y_test, y_test_pred_shifted3)
+
+    avg_cont_payoff3 = np.sum(t * y_test_pred_shifted3 - costs3) / len(y_test_pred_shifted3)
+
+    print("--")
+    print("--3.1. No information, utility maximalization--")
+    print("Number of users who changed:", len(x_changes3), " in %:", len(x_changes3)/len(x_test)*100, "%")
+    print("Average cost of change: ", avg_cost3)
+    print("Accuracy after the shift:", test_accuracy_shift3*100, "%")
+    #print("Social welfare after shift:", social_welfare_shift1, "%")
+    print("User welfare after shift:", user_welfare_shift3, "%")
+    print("Average contestant payoff:", avg_cont_payoff3)
+
+    # 3.2. NO INFORMATION - IMITATION
+    alg4 = NoInformation(x_test, strat_features, alpha, eps)
+    x_test_shifted4=alg4.algorithm4_imitation(x_train,y_train_pred, sigma, 50, t)
+    plotter2.plot_decision_surface(f, title="3.2. No information imitation TEST data with linear SVC decision boundary", X_shifted=x_test_shifted4)
+
+    x_changes4=alg4.find_differences()
+    costs4 = alg4.get_costs()
+    avg_cost4 = np.sum(costs4) / len(x_changes4)
+
+    y_test_pred_shifted4=f.predict(x_test_shifted4)
+    user_welfare_shift4=np.sum(y_test_pred_shifted4 == 1) / len(y_test_pred_shifted4) * 100
+    test_accuracy_shift4 = accuracy_score(y_test, y_test_pred_shifted4)
+
+    avg_cont_payoff4 = np.sum(t * y_test_pred_shifted4 - costs4) / len(y_test_pred_shifted4)
+
+    print("--")
+    print("--3.2. No information, imitation--")
+    print("Number of users who changed:", len(x_changes4), " in %:", len(x_changes4)/len(x_test)*100, "%")
+    print("Average cost of change: ", avg_cost4)
+    print("Accuracy after the shift:", test_accuracy_shift4*100, "%")
+    #print("Social welfare after shift:", social_welfare_shift1, "%")
+    print("User welfare after shift:", user_welfare_shift4, "%")
+    print("Average contestant payoff:", avg_cont_payoff4)
+
+    # Create table overview:
+    index_labels = [
+        "Accuracy",
+        "User welfare",
+        "Social welfare",
+        "% of user changes",
+        "Average cost of change per change",
+        "Average contestant payoff"
+    ]
+    data = {
+        "Original": [test_accuracy*100, user_welfare, social_welfare, None, None, None],
+        "1": [test_accuracy_shift1*100, user_welfare_shift1, None, len(x_changes)/len(x_test)*100, avg_cost, avg_cont_payoff],
+        "2": [test_accuracy_shift2*100, user_welfare_shift2, None, len(x_changes2)/len(x_test)*100, avg_cost2, avg_cont_payoff2],
+        "3.1.": [test_accuracy_shift3*100, user_welfare_shift3, None, len(x_changes3)/len(x_test)*100, avg_cost3, avg_cont_payoff3],
+        "3.2.": [test_accuracy_shift4*100, user_welfare_shift4, None, len(x_changes4)/len(x_test)*100, avg_cost4, avg_cont_payoff4]
+    }
+    df = pd.DataFrame(data, index=index_labels)
+
+    print(df)
+    df.to_csv("outputs/output.csv", index=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
