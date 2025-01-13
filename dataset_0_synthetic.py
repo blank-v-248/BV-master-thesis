@@ -212,6 +212,56 @@ def main(
     print(df)
     df.to_csv("outputs/output.csv", index=True)
 
+    # Create a 2x3 grid for the subplots
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+
+    # Flatten axes for easier indexing
+    axes = axes.flatten()
+
+    # Define the configurations for the plots
+    plots = [
+        {"plotter": plotter1, "title": "Original TRAINING data", "data": None},
+        {"plotter": plotter2, "title": "1: Full information TEST data shifted",
+         "data": x_test_shifted1},
+        {"plotter": plotter2, "title": "3.1: No information estimation TEST data shifted",
+         "data": x_test_shifted3},
+        {"plotter": plotter2, "title": "Original TEST data", "data": None},
+        {"plotter": plotter2, "title": "2: Partial information TEST data shifted",
+         "data": x_test_shifted2},
+        {"plotter": plotter2, "title": "3.2: No information imitation TEST data shifted",
+         "data": x_test_shifted4},
+    ]
+
+    # Plot each configuration on the corresponding subplot
+    for i, plot_config in enumerate(plots):
+        ax = axes[i]  # Get the corresponding subplot axis
+        plotter = plot_config["plotter"]  # Determine which plotter to use
+
+        # Call the appropriate function with the axis
+        if plot_config["data"] is not None:
+            plotter.plot_decision_surface(
+                f,
+                title=plot_config["title"],
+                X_shifted=plot_config["data"],
+                ax=ax  # Pass the subplot axis
+            )
+        else:
+            plotter.plot_decision_surface(
+                f,
+                title=plot_config["title"],
+                ax=ax  # Pass the subplot axis
+            )
+
+    # Adjust layout for better spacing
+    plt.tight_layout()
+    plt.subplots_adjust(hspace=0.2)
+
+    # Save the final figure
+    plt.savefig("outputs/plot_classifier_and_shift.png")
+
+    # Display the plot
+    plt.show()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dimension_number", type=int, default=2,

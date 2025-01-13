@@ -56,17 +56,18 @@ class ClassifierPlotter:
 
         # Show the plot
         plt.show()
+        plt.close()
 
-    def plot_decision_surface(self, clf, title="Decision surface", X_shifted=None):
+    def plot_decision_surface(self, clf, title="Decision surface", X_shifted=None, ax=None):
         """
-         Plots the decision surface of a fitted classifier.
+        Plots the decision surface of a fitted classifier.
 
-         Parameters:
-         clf: Fitted classifier with a predict method
-         title: Title for the plot
-         feature_names: Names of the features for axis labels
-         differing_indices: indices of differences between
-         """
+        Parameters:
+        clf: Fitted classifier with a predict method
+        title: Title for the plot
+        X_shifted: Optional shifted data to plot arrows for differences
+        ax: Matplotlib axis to plot on. If None, creates a new figure.
+        """
         if not hasattr(clf, "predict"):
             raise ValueError("The classifier does not have a predict method. Please provide a fitted classifier.")
 
@@ -79,17 +80,19 @@ class ClassifierPlotter:
         Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
         Z = Z.reshape(xx.shape)
 
-        # Plot the decision boundary and the training points
-        plt.figure(figsize=(8, 6))
-        plt.contourf(xx, yy, Z, alpha=0.3, colors=['#6FCFF5','#EA0000','#EA0000','#EA0000'])
-        for label in self.unique_labels:
-            plt.scatter(self.X[self.y == label, 0], self.X[self.y == label, 1],
-                        label=label, color=self.label_to_color[label], edgecolor='k', s=100)
-        plt.title(title)
-        plt.xlabel(self.feature_names[0])
-        plt.ylabel(self.feature_names[1])
-        plt.legend(title="Labels")
+        # Use the provided axis or create a new one
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 6))
 
+        # Plot the decision boundary and the training points
+        ax.contourf(xx, yy, Z, alpha=0.3, colors=['#6FCFF5', '#EA0000', '#EA0000', '#EA0000'])
+        for label in self.unique_labels:
+            ax.scatter(self.X[self.y == label, 0], self.X[self.y == label, 1],
+                       label=label, color=self.label_to_color[label], edgecolor='k', s=100)
+        ax.set_title(title)
+        ax.set_xlabel(self.feature_names[0])
+        ax.set_ylabel(self.feature_names[1])
+        ax.legend(title="Labels")
 
         # If X_shifted is provided, check for differences and plot arrows:
         if X_shifted is not None:
@@ -99,10 +102,10 @@ class ClassifierPlotter:
             y_labels = self.y[differing_indices]
 
             for i, (x1, x2) in enumerate(zip(X_diff, X_shifted_diff)):
-                plt.arrow(x1[0], x1[1], x2[0] - x1[0], x2[1] - x1[1], color='orange',
-                          head_width=0.05, head_length=0.1, length_includes_head=True)
-                plt.scatter(x2[0], x2[1], color=self.label_to_color[y_labels[i]], edgecolor='orange', s=100)
+                ax.arrow(x1[0], x1[1], x2[0] - x1[0], x2[1] - x1[1], color='orange',
+                         head_width=0.05, head_length=0.1, length_includes_head=True)
+                ax.scatter(x2[0], x2[1], color=self.label_to_color[y_labels[i]], edgecolor='orange', s=100)
 
-        plt.show()
-
-
+        if ax is None:
+            plt.show()
+            plt.close()
