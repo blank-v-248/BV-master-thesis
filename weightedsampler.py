@@ -81,7 +81,8 @@ class WeightedSampler: #TO-DO: make sure that there is a sample from both labels
             closest_positive_index = positive_indices[np.argmin(distances)]
 
             # Add the closest positive index to the list of indices
-            indices.append(closest_positive_index)
+            remove_index = np.random.choice(indices)
+            indices[np.where(indices == remove_index)[0][0]] = closest_positive_index
         if 0 not in sampled_y:
             # Extract all indices where y_train == 1
             negative_indices = np.where(self.y_train == 0)[0]
@@ -93,6 +94,7 @@ class WeightedSampler: #TO-DO: make sure that there is a sample from both labels
             closest_negative_index = negative_indices[np.argmin(distances)]
 
             # Add the closest positive index to the list of indices
-            indices.append(closest_negative_index)
+            remove_index = np.random.choice(indices)
+            indices[np.where(indices == remove_index)[0][0]] = closest_negative_index
 
         return indices, self.X_train[indices]

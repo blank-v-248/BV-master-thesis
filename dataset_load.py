@@ -1,8 +1,7 @@
 
-def synth_data(dimensions=2, random_seed=24):
+def synth_data(dimensions=2, random_seed=24, num_points=100):
     if dimensions==2:
         # Generate 2D cluster data
-        num_points = 100
         np.random.seed(random_seed)
 
         # Cluster 1 centered around (12, 180)
