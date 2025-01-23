@@ -83,14 +83,13 @@ class Fullinformation:
                 ]
 
                 # Solve the optimization problem with scipy minimize, equation 4:
-                result = minimize(objective, x0_strat, constraints=cons_equations)
+                result = minimize(objective, x0_strat, constraints=cons_equations, tol= 1e-8, options={"maxiter": 1000})
 
                 # Check if the optimization was successful
                 if result.success:
                     opt_strat_x = result.x #.reshape(1, m)
                 else:
                     opt_strat_x = x0_strat  # Retain the original x0_strat
-
 
                 # Get the cost of optimal value:
                 self.costs[i] = cost_func(opt_strat_x, x0_strat)

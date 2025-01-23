@@ -23,7 +23,7 @@ def difference_finder(X0, X1):
     return differing_indices
 
 class ClassifierPlotter:
-    def __init__(self, X, y, feature_names=["Feature 1", "Feature 2"]):
+    def __init__(self, X, y, feature_names=["Feature 1", "Feature 2"], x_lim=[-3,3], y_lim=[-3,3]):
         self.X = X
         self.y = y
         self.feature_names=feature_names
@@ -35,10 +35,13 @@ class ClassifierPlotter:
 
         # Map the labels to colors
         self.label_to_color = {self.unique_labels[0]: colors[0], self.unique_labels[1]: colors[1]}
+        self.x_lim=x_lim
+
+
+        self.y_lim = y_lim
 
     def plot_orig_dataset(self, title="Original Dataset", ):
-        plt.figure(figsize=(8, 6))
-
+        plt.figure(figsize=(6, 6))
 
 
         # Scatter plot with different colors for the two labels
@@ -50,6 +53,12 @@ class ClassifierPlotter:
         plt.xlabel(self.feature_names[0])
         plt.ylabel(self.feature_names[1])
         plt.title(title)
+
+        # Set axis limits
+
+        plt.axis('square')
+        plt.xlim(self.x_lim[0],self.x_lim[1])
+        plt.ylim(self.y_lim[0], self.y_lim[1])
 
         # Add a legend
         plt.legend(title="Labels")
@@ -72,9 +81,9 @@ class ClassifierPlotter:
             raise ValueError("The classifier does not have a predict method. Please provide a fitted classifier.")
 
         # Create a mesh grid for the 2D feature space
-        x_min, x_max = self.X[:, 0].min() - 1, self.X[:, 0].max() + 1
-        y_min, y_max = self.X[:, 1].min() - 1, self.X[:, 1].max() + 1
-        xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.01), np.arange(y_min, y_max, 0.01))
+        #x_min, x_max = self.X[:, 0].min() - 1, self.X[:, 0].max() + 1
+        #y_min, y_max = self.X[:, 1].min() - 1, self.X[:, 1].max() + 1
+        xx, yy = np.meshgrid(np.arange(self.x_lim[0]-0.5, self.x_lim[1]+0.5, 0.01), np.arange(self.y_lim[0]-0.5, self.y_lim[1]+0.5, 0.01))
 
         # Predict for each point in the mesh grid
         Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
@@ -82,7 +91,7 @@ class ClassifierPlotter:
 
         # Use the provided axis or create a new one
         if ax is None:
-            fig, ax = plt.subplots(figsize=(8, 6))
+            fig, ax = plt.subplots(figsize=(6, 6))
 
         # Plot the decision boundary and the training points
         ax.contourf(xx, yy, Z, alpha=0.3, colors=['#6FCFF5', '#EA0000', '#EA0000', '#EA0000'])
@@ -93,6 +102,9 @@ class ClassifierPlotter:
         ax.set_xlabel(self.feature_names[0])
         ax.set_ylabel(self.feature_names[1])
         ax.legend(title="Labels")
+
+        ax.axis('equal')
+        ax.set(xlim=(self.x_lim[0], self.x_lim[1]), ylim=(self.y_lim[0], self.y_lim[1]))
 
         # If X_shifted is provided, check for differences and plot arrows:
         if X_shifted is not None:
@@ -105,6 +117,9 @@ class ClassifierPlotter:
                 ax.arrow(x1[0], x1[1], x2[0] - x1[0], x2[1] - x1[1], color='orange',
                          head_width=0.05, head_length=0.1, length_includes_head=True)
                 ax.scatter(x2[0], x2[1], color=self.label_to_color[y_labels[i]], edgecolor='orange', s=100)
+
+                ax.axis('equal')
+                ax.set(xlim=(self.x_lim[0], self.x_lim[1]), ylim=(self.y_lim[0], self.y_lim[1]))
 
         if ax is None:
             plt.show()

@@ -35,14 +35,16 @@ class main_class:
     def info_comparison(self):
 
         x_train, x_test, y_train, y_test = synth_data(dimensions=self.dimension_number, random_seed=42, num_points=int(self.n/2))
+        x_test=x_test[10:19]
+        y_test = y_test[10:19]
 
         print("The shape of X train:")
         print(x_train.shape)
 
         # Plot original dataset:
-        plotter1=ClassifierPlotter(x_train, y_train)
+        plotter1=ClassifierPlotter(x_train, y_train, x_lim=[-3,3], y_lim=[-3,3])
         plotter1.plot_orig_dataset(title="Original TRAINING data")
-        plotter2=ClassifierPlotter(x_test, y_test)
+        plotter2=ClassifierPlotter(x_test, y_test, x_lim=[-3,3], y_lim=[-3,3])
         plotter2.plot_orig_dataset(title="Original TEST data")
 
         # Train a linear classifier on the data
@@ -75,6 +77,14 @@ class main_class:
         # 1. FULL INFORMATION
         bestresponse=Fullinformation(x_test, self.strat_features.tolist())
         x_test_shifted1 = bestresponse.algorithm2(self.alpha, f, self.t, self.eps, mod_type="dec_f", threshold=0)
+
+        #checking if they are orthogonal:
+        diff_vectors = x_test_shifted1 - x_test
+        angles = np.degrees(np.arctan2(diff_vectors[:, 1], diff_vectors[:, 0]))
+        angle_f=np.degrees(np.arctan2(w_f[0][1],w_f[0][0]))
+        print(angles)
+        print(angle_f)
+        print(angles-angle_f)
 
         plotter2.plot_decision_surface(f, title="1: Full information TEST data with linear SVC decision boundary", X_shifted=x_test_shifted1)
 
@@ -143,7 +153,7 @@ class main_class:
 
         alg4=NoInformation(x_test, self.strat_features, self.alpha,  self.eps)
 
-        x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, 50, 2*self.t, threshold=0.5 )
+        x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, 50, self.t, threshold=0.5 )
         plotter2.plot_decision_surface(f, title="3.1. No information estimation TEST data with linear SVC decision boundary", X_shifted=x_test_shifted3)
 
         x_changes3=alg4.find_differences()
@@ -167,7 +177,7 @@ class main_class:
 
         # 3.2. NO INFORMATION - IMITATION
         alg4 = NoInformation(x_test, self.strat_features, self.alpha, self.eps)
-        x_test_shifted4=alg4.algorithm4_imitation(x_train,y_train_pred, sigma, 50, 2*self.t)
+        x_test_shifted4=alg4.algorithm4_imitation(x_train,y_train_pred, sigma, 50, self.t)
         plotter2.plot_decision_surface(f, title="3.2. No information imitation TEST data with linear SVC decision boundary", X_shifted=x_test_shifted4)
 
         x_changes4=alg4.find_differences()
