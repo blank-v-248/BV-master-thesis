@@ -21,22 +21,24 @@ import copy
 warnings.filterwarnings(action='ignore', category=DataConversionWarning)
 
 class main_class:
-    def __init__(self, dimension_number: int, plotname: str, tablename: str) -> None:
+    def __init__(self, dimension_number: int, n: int, t: float, eps : float) -> None:
         self.dimension_number = dimension_number
-        self.plotname = plotname
-        self.tablename = tablename
+        self.plotname = "plot1.pdf"
+        self.tablename = "table1.csv"
         self.strat_features = np.array([0, 1])
         self.alpha = np.array([1, 1]).reshape(2, 1)
-        self.t = 2
-        self.eps = 0.8
+        self.t = t
+        self.eps = eps
         self.feature_names = ["Feature1", "Feature2"]
-        self.n=200
+        self.n=n
+        self.threshold=1e-07
 
-    def info_comparison(self):
-
-        x_train, x_test, y_train, y_test = synth_data(dimensions=self.dimension_number, random_seed=42, num_points=int(self.n/2))
-        x_test=x_test[10:19]
-        y_test = y_test[10:19]
+    def info_comparison(self, moons: bool):
+        if moons:
+            x_train, x_test, y_train, y_test = synth_data_moons(dimensions=self.dimension_number, random_seed=42,
+                                                      num_points=self.n)
+        else:
+            x_train, x_test, y_train, y_test = synth_data(dimensions=self.dimension_number, random_seed=42, num_points=int(self.n/2))
 
         print("The shape of X train:")
         print(x_train.shape)
@@ -76,7 +78,7 @@ class main_class:
 
         # 1. FULL INFORMATION
         bestresponse=Fullinformation(x_test, self.strat_features.tolist())
-        x_test_shifted1 = bestresponse.algorithm2(self.alpha, f, self.t, self.eps, mod_type="dec_f", threshold=0)
+        x_test_shifted1 = bestresponse.algorithm2(self.alpha, f, self.t, self.eps, mod_type="dec_f", threshold= self.threshold) #add a small threshhold to make it positive for sure
 
         #checking if they are orthogonal:
         diff_vectors = x_test_shifted1 - x_test
@@ -151,14 +153,16 @@ class main_class:
         # 3.1. NO INFORMATION - UTILITY MAXIMIZATION
         sigma = 1.0  # Bandwidth parameter for weigthed sampling
 
-        alg4=NoInformation(x_test, self.strat_features, self.alpha,  self.eps)
+        alg4=NoInformation(x_test, self.strat_features, self.alpha,  self.eps, y_test=y_train, plotting_ind=1)
 
-        x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, 50, self.t, threshold=0.5 )
+        x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, 3, self.t, threshold=self.threshold)
         plotter2.plot_decision_surface(f, title="3.1. No information estimation TEST data with linear SVC decision boundary", X_shifted=x_test_shifted3)
 
         x_changes3=alg4.find_differences()
         costs3 = alg4.get_costs()
         avg_cost3 = np.sum(costs3) / len(x_changes3)
+
+        alg4.plot_sample()
 
         y_test_pred_shifted3=f.predict(x_test_shifted3)
         user_welfare_shift3=np.sum(y_test_pred_shifted3 == 1) / len(y_test_pred_shifted3) * 100
@@ -276,23 +280,51 @@ class main_class:
         self.x_test=np.copy(x_test)
         self.x_train = np.copy(x_train)
         self.y_test=np.copy(y_test)
-        self.y_train = np.copy(y_train)
 
     def pop_plotter(self):
-        m_list = [self.n * (i*5 / 100) for i in range(1, 11)]
+        m_list = [self.n * (i*5 / 100) for i in range(1, 19)]
         # 3.1. NO INFORMATION - UTILITY MAXIMIZATION with different sample sizes
         sigma = 1.0  # Bandwidth parameter for weigthed sampling
         y_train_pred=self.initial_model.predict(self.x_train)
 
         alg4=NoInformation(self.x_test, self.strat_features, self.alpha,  self.eps)
-        accuracies_pop=[]
+        errors_pop=[]
         for m in m_list:
-            x_test_shifted3=alg4.algorithm4_utility(self.x_train, y_train_pred, sigma, int(m), 2*self.t, threshold=0.5 )
+            x_test_shifted3=alg4.algorithm4_utility(self.x_train, y_train_pred, sigma, int(m), 2*self.t, threshold=self.threshold )
             y_test_pred_shifted3=self.initial_model.predict(x_test_shifted3)
-            accuracies_pop.append( accuracy_score(self.y_test, y_test_pred_shifted3))
-        plt.plot(accuracies_pop)
-        plt.show()
+            errors_pop.append(100-accuracy_score(self.y_test, y_test_pred_shifted3)*100)
+        plt.plot(m_list, errors_pop, label="3.1. No information")
 
+        # fully informed case:
+        error_full = 100-self.results["1"]["Accuracy"]
+        error_non = 100-self.results["Original"]["Accuracy"]
+        error_part=100-self.results["2"]["Accuracy"]
+        plt.axhline(y=error_non, color='red', linestyle='--', label="0. Non-strategic")
+        plt.axhline(y=error_full, color='blue', linestyle='-', label="1. Full information")
+        plt.axhline(y=error_part, color='orange', linestyle=':',  label="2. Partial information")
+
+        plt.fill_between(
+            m_list,  # x values (indices of accuracies_pop)
+            error_full,  # Lower boundary (the plotted accuracies)
+            errors_pop,  # Upper boundary (the horizontal line)
+            #where=(np.array(errors_pop) >= error_full),  # Only fill where condition is true
+            facecolor='#DBDBDB',  # Fill color
+            alpha=0.3,  # Transparency
+            hatch='///',  # Striped pattern
+            edgecolor = 'grey',
+            linewidth = 0.0
+        )
+
+        plt.xlabel("m (sample size)")
+        plt.ylabel("Error [%]")
+        plt.title("Errors in different information scenarios")
+        plt.legend()
+
+        plt.xlim(m_list[0],m_list[(len(m_list)-1)])
+
+        plt.savefig(f"outputs/plot2_pop.pdf")
+
+        plt.show()
 
 
 
@@ -300,21 +332,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dimension_number", type=int, default=2,
                     help="Number of dimensions for synthetic data.")
-    parser.add_argument("--plotname", type=str, default="plot.png",
-                        help="Plot name for 6 subplots")
-    parser.add_argument("--tablename", type=str, default="table.csv",
-                        help="Table name for performance metrics")
-
-
+    parser.add_argument("--n", type=int, default=400,
+                        help="Number of datapoints in total for synthetic data. 10% test, 90% training split.")
+    parser.add_argument("--t", type=float, default=2,
+                        help="Controls the budget for changes. The higher t, the higher costs users are willing to pay.")
+    parser.add_argument("--eps", type=float, default=2,
+                        help="The weight of the quadratic element in the mixed cost function.")
+    parser.add_argument("--moons", type=bool, default=False,
+                        help="If true, the moons dataset is used. If false, synthetic data has gaussian clusters.")
 
     args = parser.parse_args()
 
     processor = main_class(
         dimension_number=args.dimension_number,
-        plotname=args.plotname,
-        tablename=args.tablename
-
+        n=args.n,
+        t=args.t,
+        eps=args.eps,
     )
 
-    processor.info_comparison()
+    processor.info_comparison(moons=args.moons)
     processor.pop_plotter()

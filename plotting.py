@@ -67,7 +67,7 @@ class ClassifierPlotter:
         plt.show()
         plt.close()
 
-    def plot_decision_surface(self, clf, title="Decision surface", X_shifted=None, ax=None):
+    def plot_decision_surface(self, clf, title="Decision surface", X_shifted=None, ax=None, highlighted_ind=None):
         """
         Plots the decision surface of a fitted classifier.
 
@@ -102,6 +102,11 @@ class ClassifierPlotter:
         ax.set_xlabel(self.feature_names[0])
         ax.set_ylabel(self.feature_names[1])
         ax.legend(title="Labels")
+
+        if highlighted_ind is not None:
+            highlighted_point = self.X[highlighted_ind]
+            ax.scatter(highlighted_point[0], highlighted_point[1],
+                       edgecolor='pink', facecolor='none', s=300, linewidth=2, label=f"Highlighted Point")
 
         ax.axis('equal')
         ax.set(xlim=(self.x_lim[0], self.x_lim[1]), ylim=(self.y_lim[0], self.y_lim[1]))

@@ -6,6 +6,7 @@ from cost_functions import MixWeightedLinearSumSquareCostFunction
 from weightedsampler import *
 from sklearn.svm import LinearSVC
 from lime.lime_tabular import LimeTabularExplainer
+from plotting import *
 
 def difference_finder(X0, X1):
     """
@@ -88,11 +89,14 @@ class Fullinformation:
                 # Check if the optimization was successful
                 if result.success:
                     opt_strat_x = result.x #.reshape(1, m)
+                    assert model.predict(opt_strat_x.reshape(1, -1)) == 1, "Change happening, however prediction not worthwile!"
                 else:
                     opt_strat_x = x0_strat  # Retain the original x0_strat
 
                 # Get the cost of optimal value:
                 self.costs[i] = cost_func(opt_strat_x, x0_strat)
+
+
 
                 # Update X_strat based on the cost constraint: only change, if change does not too costly = feasible
                 if self.costs[i]<2*t:
@@ -117,16 +121,18 @@ class Fullinformation:
         return differing_indices
 
 class NoInformation:
-    def __init__(self, X_test, strat_features, alpha, eps):
-        self.X = X_test
+    def __init__(self, X_test, strat_features, alpha, eps, y_test=None, plotting_ind=None):
+        self.X_test = X_test
         self.strat_features = strat_features
         self.alpha=alpha
         self.eps=eps
+        self.y_test=y_test
+        self.plotting_ind=plotting_ind
 
     def algorithm4_utility(self, X_train, y_train_pred, sigma,m, t, threshold):
         ws = WeightedSampler(X_train, sigma, y_train_pred) # initialize weighted sampler
-        n = (self.X.shape[0])
-        dim = (self.X.shape[1])
+        n = (self.X_test.shape[0])
+        dim = (self.X_test.shape[1])
 
         # create arrays to store results
         y_pred_est = np.empty(n)
@@ -134,7 +140,7 @@ class NoInformation:
         x_shifted = np.empty([n,dim])
         costs=np.empty(n)
 
-        for ind, x in enumerate(self.X): # go over every user in the test set
+        for ind, x in enumerate(self.X_test): # go over every user in the test set
             ind_c, T_c = ws.sample(x, m) # every user samples m other users from X_train
             y_c = y_train_pred[ind_c].reshape(m, 1) #users learn about the predictions in the sample
 
@@ -151,6 +157,13 @@ class NoInformation:
             x_shifted[ind,]=x_shift[0]
             y_pred_est_after[ind]=f_est.predict(x_shifted[ind].reshape(1, -1))
             costs[ind]=bestresponse_sample.get_costs()
+
+            #Save results for plotting:
+            if ind==self.plotting_ind:
+                self.x_plotting = np.vstack((x, T_c))
+                self.y_plotting = self.y_test[np.hstack((ind, ind_c))]
+                self.model_plotting = f_est
+                self.x_shifted_plotting=np.vstack((x_shift[0], T_c))
 
         self.y_pred_est=np.copy(y_pred_est)
         self.y_pred_est_after = np.copy(y_pred_est_after)
@@ -171,16 +184,14 @@ class NoInformation:
         discriminant = B ** 2 + 8 * A * t
 
         # Ensure the discriminant is non-negative
-        if discriminant < 0:
-            raise ValueError("Discriminant is negative, no real solutions for beta.")
+        assert discriminant >= 0, "Discriminant is negative, no real solutions for beta." # D has to be non-negative
 
         # Calculate the two possible beta values
         sqrt_discriminant = np.sqrt(discriminant)
 
         beta_1 = 1 - (-B + sqrt_discriminant) / (2 * A)
         beta_2 = 1 - (-B - sqrt_discriminant) / (2 * A) # the larger beta should always be larger than 1 (beta=1 means no change, should be feasible)
-        if beta_2 < 1:
-            raise ValueError("Beta=1 not feasible")
+        assert beta_2 >= 1, "Beta=1 not feasible" # if beta_2 < 1 not feasible solution
         # Pick the beta that is within [0, 1]
         if beta_1 <= 0: # if total change possible, take beta=0 (x shifts to x_p)
             return 0
@@ -190,11 +201,11 @@ class NoInformation:
     def algorithm4_imitation(self, X_train, y_train_pred, sigma,m, t):
         ws = WeightedSampler(X_train, sigma, y_train_pred)
         cost_func = MixWeightedLinearSumSquareCostFunction(self.alpha, self.eps)
-        n = (self.X.shape[0])
+        n = (self.X_test.shape[0])
 
-        x_shifted = np.empty((self.X.shape))
+        x_shifted = np.empty((self.X_test.shape))
         costs=[]
-        for ind, x in enumerate(self.X):
+        for ind, x in enumerate(self.X_test):
             ind_c, T_c = ws.sample(x, m) #users take a sample from X_train
             y_c = y_train_pred[ind_c].reshape(m, 1) #users get the models decision on that sample
 
@@ -221,7 +232,7 @@ class NoInformation:
     def find_differences(self):
 
         # Get the indices of the differing elements
-        differing_indices =  difference_finder(self.X, self.X_shifted)
+        differing_indices =  difference_finder(self.X_test, self.X_shifted)
 
         return differing_indices
 
@@ -232,6 +243,12 @@ class NoInformation:
     def est_pred_after(self):
         # Returns the estimated model outcome of the users after the shift
         return self.y_pred_est_after
+
+    def plot_sample(self):
+        if self.plotting_ind==None:
+            raise ValueError("Plotting index is none. If plotting is requested, choose an index of the test set.")
+        plotter=ClassifierPlotter(self.x_plotting,self.y_plotting)
+        plotter.plot_decision_surface(self.model_plotting, X_shifted=self.x_shifted_plotting, highlighted_ind=0)
 
 class PartialInformation:
     def __init__(self, x_train, x_test, strat_features):
