@@ -84,7 +84,7 @@ class Fullinformation:
                 ]
 
                 # Solve the optimization problem with scipy minimize, equation 4:
-                result = minimize(objective, x0_strat, constraints=cons_equations, tol= 1e-8, options={"maxiter": 1000})
+                result = minimize(objective, x0_strat, constraints=cons_equations,  tol= 1e-8, options={"maxiter": 1000}) #method="trust-constr",
 
                 # Check if the optimization was successful
                 if result.success:
@@ -313,7 +313,7 @@ class PartialInformation:
 
         return parsed_output
 
-    def algorithm3(self, f, threshold, alpha, epsilon, budget=2):
+    def algorithm3(self, f, threshold, alpha, epsilon, budget=2, mod_type="dec_f"):
         explainer = LimeTabularExplainer( # A lime explainer is trained on X_train
             training_data=self.X_train,
             feature_names=list(range(self.X_train.shape[1])),
@@ -330,10 +330,16 @@ class PartialInformation:
 
         delta_L=np.copy(self.X_test) # the shifted X is created as a copy of the original
         for i in range(self.X_test.shape[0]): # loop over every instance
-            exp = explainer.explain_instance( # create explanation for that instance
-                data_row=self.X_test[i],
-                predict_fn=predict_proba_linSVC
-            )
+            if mod_type=="dec_f":
+                exp = explainer.explain_instance( # create explanation for that instance
+                    data_row=self.X_test[i],
+                    predict_fn=predict_proba_linSVC
+                )
+            else:
+                exp = explainer.explain_instance( # create explanation for that instance
+                    data_row=self.X_test[i],
+                    predict_fn=f.predict_proba
+                )
             exp_values = exp.as_list() #export explanation values
             loc_prob =exp.local_pred # export probability of prediction of LIME
 
@@ -380,7 +386,11 @@ class PartialInformation:
                             delta_L[i, feat] = Z_up
                             cost_cum += cost_up
                         # Check if the prediction is already positive:
-                        new_exp_loc_prob = explainer.explain_instance(data_row=delta_L[i,], predict_fn=predict_proba_linSVC).local_pred
+                        if mod_type=="dec_f":
+                            new_exp_loc_prob = explainer.explain_instance(data_row=delta_L[i,], predict_fn=predict_proba_linSVC).local_pred
+                        else:
+                            new_exp_loc_prob = explainer.explain_instance(data_row=delta_L[i,],
+                                                                          predict_fn=f.predict_proba).local_pred
                         if new_exp_loc_prob >= threshold: # if it is positive, the user does not change anymore features
                             continue
                 self.costs.append(cost_cum)

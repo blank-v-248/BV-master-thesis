@@ -12,6 +12,9 @@ from dataset_load import *
 
 from weightedsampler import *
 from sklearn.neural_network import MLPClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+
 
 import warnings
 from sklearn.exceptions import DataConversionWarning
@@ -23,23 +26,24 @@ warnings.filterwarnings(action='ignore', category=DataConversionWarning)
 class main_class:
     def __init__(self, dimension_number: int, n: int, t: float, eps : float) -> None:
         self.dimension_number = dimension_number
-        self.plotname = "plot1.pdf"
-        self.tablename = "table1.csv"
+        self.plotname = "moons_lin.pdf"
+        self.tablename = "moons_lin.csv"
         self.strat_features = np.array([0, 1])
         self.alpha = np.array([1, 1]).reshape(2, 1)
         self.t = t
         self.eps = eps
         self.feature_names = ["Feature1", "Feature2"]
         self.n=n
-        self.threshold=1e-07
+        self.threshold=0.5+1e-06
 
-    def info_comparison(self, moons: bool):
+    def info_comparison(self, moons: bool, linear: bool):
         if moons:
             x_train, x_test, y_train, y_test = synth_data_moons(dimensions=self.dimension_number, random_seed=42,
                                                       num_points=self.n)
         else:
             x_train, x_test, y_train, y_test = synth_data(dimensions=self.dimension_number, random_seed=42, num_points=int(self.n/2))
-
+        #x_test = x_test[[58, 97, 98]]
+        #y_test = y_test[[58, 97, 98]]
         print("The shape of X train:")
         print(x_train.shape)
 
@@ -50,18 +54,26 @@ class main_class:
         plotter2.plot_orig_dataset(title="Original TEST data")
 
         # Train a linear classifier on the data
-        f = LinearSVC(dual=False)
+        if linear:
+            f = LinearSVC(dual=False)
+        else:
+            print("random forest is applied")
+            f = RandomForestClassifier(n_estimators=10, random_state=24)
+            #f = MLPClassifier(hidden_layer_sizes=(10,10,10), activation='relu', solver='adam', max_iter=1000, random_state=24)
+            #f=KNeighborsClassifier(n_neighbors=11)
         f.fit(x_train, y_train)
         self.initial_model = copy.deepcopy(f)
 
-        f.decision_function(x_test)
+        if linear:
+            f.decision_function(x_test)
 
         # Plot the decision surface
         plotter1.plot_decision_surface(f, title="Original TRAINING data with linear SVC decision boundary")
         plotter2.plot_decision_surface(f, title="Original TEST data with linear SVC decision boundary")
 
         #  Extract and save the coefficient weights to w_f
-        w_f = f.coef_
+        if linear:
+         w_f = f.coef_
 
         # Get accuracies:
         y_train_pred = f.predict(x_train)
@@ -72,21 +84,25 @@ class main_class:
 
         # Display the coefficient weights
         print("--Original model--")
-        print("Coefficient weights w_f:", w_f)
+        if linear:
+            print("Coefficient weights w_f:", w_f)
         print("Training accuracy:", train_accuracy)
         print("Test accuracy:", test_accuracy)
 
+        model_type = "dec_f" if linear else "pred_proba"
+
         # 1. FULL INFORMATION
         bestresponse=Fullinformation(x_test, self.strat_features.tolist())
-        x_test_shifted1 = bestresponse.algorithm2(self.alpha, f, self.t, self.eps, mod_type="dec_f", threshold= self.threshold) #add a small threshhold to make it positive for sure
+        x_test_shifted1 = bestresponse.algorithm2(self.alpha, f, self.t, self.eps, mod_type="model_type", threshold= self.threshold) #add a small threshhold to make it positive for sure
 
         #checking if they are orthogonal:
-        diff_vectors = x_test_shifted1 - x_test
-        angles = np.degrees(np.arctan2(diff_vectors[:, 1], diff_vectors[:, 0]))
-        angle_f=np.degrees(np.arctan2(w_f[0][1],w_f[0][0]))
-        print(angles)
-        print(angle_f)
-        print(angles-angle_f)
+        if linear:
+            diff_vectors = x_test_shifted1 - x_test
+            angles = np.degrees(np.arctan2(diff_vectors[:, 1], diff_vectors[:, 0]))
+            angle_f=np.degrees(np.arctan2(w_f[0][1],w_f[0][0]))
+            print(angles)
+            print(angle_f)
+            print(angles-angle_f)
 
         plotter2.plot_decision_surface(f, title="1: Full information TEST data with linear SVC decision boundary", X_shifted=x_test_shifted1)
 
@@ -125,7 +141,7 @@ class main_class:
         # Create a LIME explainer
         Lime=PartialInformation(x_train, x_test, self.strat_features)
 
-        x_test_shifted2=Lime.algorithm3(f, 0.4, self.alpha, self.eps)
+        x_test_shifted2=Lime.algorithm3(f, 0.4, self.alpha, self.eps, mod_type=model_type)
 
         plotter2.plot_decision_surface(f, title="2: Partial information TEST data with linear SVC decision boundary",
                                        X_shifted=x_test_shifted2)
@@ -155,7 +171,7 @@ class main_class:
 
         alg4=NoInformation(x_test, self.strat_features, self.alpha,  self.eps, y_test=y_train, plotting_ind=1)
 
-        x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, 3, self.t, threshold=self.threshold)
+        x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, int(self.n/100), self.t, threshold=self.threshold)
         plotter2.plot_decision_surface(f, title="3.1. No information estimation TEST data with linear SVC decision boundary", X_shifted=x_test_shifted3)
 
         x_changes3=alg4.find_differences()
@@ -322,7 +338,7 @@ class main_class:
 
         plt.xlim(m_list[0],m_list[(len(m_list)-1)])
 
-        plt.savefig(f"outputs/plot2_pop.pdf")
+        plt.savefig(f"outputs/moons_lin_pop.pdf")
 
         plt.show()
 
@@ -338,8 +354,10 @@ if __name__ == "__main__":
                         help="Controls the budget for changes. The higher t, the higher costs users are willing to pay.")
     parser.add_argument("--eps", type=float, default=2,
                         help="The weight of the quadratic element in the mixed cost function.")
-    parser.add_argument("--moons", type=bool, default=False,
-                        help="If true, the moons dataset is used. If false, synthetic data has gaussian clusters.")
+    parser.add_argument("--moons", action="store_true",
+                        help="If set, the moons dataset is used. Otherwise, synthetic data has Gaussian clusters.")
+    parser.add_argument("--linear", action="store_true",
+                        help="If set, a linear SVC classifier is used. Otherwise, a kernelized SVC is applied.")
 
     args = parser.parse_args()
 
@@ -350,5 +368,5 @@ if __name__ == "__main__":
         eps=args.eps,
     )
 
-    processor.info_comparison(moons=args.moons)
+    processor.info_comparison(moons=args.moons, linear=args.linear)
     processor.pop_plotter()
