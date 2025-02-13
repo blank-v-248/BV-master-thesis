@@ -1,7 +1,7 @@
 # TO-DO: apply strategic features everywhere!
 
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize, NonlinearConstraint
 from cost_functions import MixWeightedLinearSumSquareCostFunction
 from weightedsampler import *
 from sklearn.svm import LinearSVC
@@ -58,40 +58,47 @@ class Fullinformation:
         m = len(self.strat_features)
         X_strat = np.copy(self.X)
         self.costs = np.zeros(n)
+        index_of_failed_opt=[]
 
         for i in range(n): #iterate over all instances
             if model.predict(X_strat[i,].reshape(1, -1)) != 1:  # people only change, if they get predicted as -1
                 x0_strat = X_strat[i, self.strat_features]  # these are the features that agent can change
-
                 # Define the cost function by class:
                 cost_func = MixWeightedLinearSumSquareCostFunction(alpha, epsilon)
 
                 # Define the objective function and constraint: minimize costs while getting +1 decision
                 objective = lambda x: cost_func(x, x0_strat)  # mixed cost should be minimized
 
-                def constraint_function(x, X_strat=X_strat):# so that the prediction of the model is 1 = wortwhile
-                    # f(x')=1
-                    # OUTPUT NEEDS TO BE CONTINOUS!
-                    X_i = np.copy(X_strat[i,])
+                def constraint_function(x, X_strat=X_strat, X_i=None, i=i):  # Explicitly pass i
+                    if X_i is None:
+                        X_i = np.copy(X_strat[i,])  # i is properly captured
                     np.put(X_i, self.strat_features, x)
+
                     if mod_type == "dec_f":
-                        return model.decision_function(X_i.reshape(1, -1))- threshold
+                        return model.decision_function(X_i.reshape(1, -1)) - threshold
                     else:
                         return model.predict_proba(X_i.reshape(1, -1))[0, 1] - threshold
+
+                constraints = NonlinearConstraint(constraint_function, 0, np.inf)
+
+                result = minimize(objective, x0_strat, constraints=constraints,
+                                  options={"maxiter": 100000, "barrier_tol": 1e-6, "gtol": 1e-6},
+                                  method="trust-constr")
 
                 cons_equations = [
                     {'type': 'ineq', 'fun': constraint_function},
                 ]
 
                 # Solve the optimization problem with scipy minimize, equation 4:
-                result = minimize(objective, x0_strat, constraints=cons_equations,  tol= 1e-8, options={"maxiter": 1000}) #method="trust-constr",
+                #result = minimize(objective, x0_strat, constraints=cons_equations,  tol= 1e-8, options={"maxiter": 1000}, method="COBYQA") #method="trust-constr", "COBLYA" SLSQP
 
                 # Check if the optimization was successful
                 if result.success:
                     opt_strat_x = result.x #.reshape(1, m)
-                    assert model.predict(opt_strat_x.reshape(1, -1)) == 1, "Change happening, however prediction not worthwile!"
+                    assert model.predict(opt_strat_x.reshape(1, -1)) == 1, f"Change happening, however prediction not worthwile! Problematic index: {i}"
                 else:
                     opt_strat_x = x0_strat  # Retain the original x0_strat
+                    index_of_failed_opt.append(i)
 
                 # Get the cost of optimal value:
                 self.costs[i] = cost_func(opt_strat_x, x0_strat)
@@ -108,6 +115,7 @@ class Fullinformation:
 
         ###returns:
         # X_strat: the new feautures of the agents
+        print("Opt failed indices:", index_of_failed_opt)
         return X_strat
 
     def get_costs(self):
@@ -119,6 +127,7 @@ class Fullinformation:
         differing_indices = difference_finder(self.X, self.X_shifted)
 
         return differing_indices
+
 
 class NoInformation:
     def __init__(self, X_test, strat_features, alpha, eps, y_test=None, plotting_ind=None):
