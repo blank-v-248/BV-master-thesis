@@ -81,16 +81,14 @@ class Fullinformation:
 
                 constraints = NonlinearConstraint(constraint_function, 0, np.inf)
 
-                result = minimize(objective, x0_strat, constraints=constraints,
-                                  options={"maxiter": 100000, "barrier_tol": 1e-6, "gtol": 1e-6},
-                                  method="trust-constr")
+                #result = minimize(objective, x0_strat, constraints=constraints,options={"maxiter": 100000, "barrier_tol": 1e-6, "gtol": 1e-6},method="trust-constr")
 
                 cons_equations = [
                     {'type': 'ineq', 'fun': constraint_function},
                 ]
 
                 # Solve the optimization problem with scipy minimize, equation 4:
-                #result = minimize(objective, x0_strat, constraints=cons_equations,  tol= 1e-8, options={"maxiter": 1000}, method="COBYQA") #method="trust-constr", "COBLYA" SLSQP
+                result = minimize(objective, x0_strat, constraints=cons_equations,  tol= 1e-8, options={"maxiter": 1000}, method="SLSQP") #method="trust-constr", "COBLYA" SLSQP
 
                 # Check if the optimization was successful
                 if result.success:
@@ -113,9 +111,10 @@ class Fullinformation:
 
                 self.X_shifted=np.copy(X_strat)
 
+        #save failed indices:
+        self.index_of_failed_opt=index_of_failed_opt
+
         ###returns:
-        # X_strat: the new feautures of the agents
-        print("Opt failed indices:", index_of_failed_opt)
         return X_strat
 
     def get_costs(self):
@@ -127,6 +126,9 @@ class Fullinformation:
         differing_indices = difference_finder(self.X, self.X_shifted)
 
         return differing_indices
+    def get_failed_ind(self):
+        # Returns the indices where optimizer failed
+        return self.index_of_failed_opt
 
 
 class NoInformation:
@@ -257,7 +259,7 @@ class NoInformation:
         if self.plotting_ind==None:
             raise ValueError("Plotting index is none. If plotting is requested, choose an index of the test set.")
         plotter=ClassifierPlotter(self.x_plotting,self.y_plotting)
-        plotter.plot_decision_surface(self.model_plotting, X_shifted=self.x_shifted_plotting, highlighted_ind=0)
+        plotter.plot_decision_surface(self.model_plotting, X_shifted=self.x_shifted_plotting, highlighted_ind_circle=0)
 
 class PartialInformation:
     def __init__(self, x_train, x_test, strat_features):

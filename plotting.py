@@ -67,7 +67,7 @@ class ClassifierPlotter:
         plt.show()
         plt.close()
 
-    def plot_decision_surface(self, clf, title="Decision surface", X_shifted=None, ax=None, highlighted_ind=None):
+    def plot_decision_surface(self, clf, title="Decision surface", X_shifted=None, ax=None, highlighted_ind_circle=None, highlighted_ind_x=None):
         """
         Plots the decision surface of a fitted classifier.
 
@@ -76,6 +76,8 @@ class ClassifierPlotter:
         title: Title for the plot
         X_shifted: Optional shifted data to plot arrows for differences
         ax: Matplotlib axis to plot on. If None, creates a new figure.
+        highlighted_ind_circle: Index of a point to highlight with a pink circle
+        highlighted_ind_x: Indices of points to highlight with red 'X'
         """
         if not hasattr(clf, "predict"):
             raise ValueError("The classifier does not have a predict method. Please provide a fitted classifier.")
@@ -103,10 +105,15 @@ class ClassifierPlotter:
         ax.set_ylabel(self.feature_names[1])
         ax.legend(title="Labels")
 
-        if highlighted_ind is not None:
-            highlighted_point = self.X[highlighted_ind]
+        if highlighted_ind_circle is not None:
+            highlighted_point = self.X[highlighted_ind_circle]
             ax.scatter(highlighted_point[0], highlighted_point[1],
                        edgecolor='pink', facecolor='none', s=300, linewidth=2, label=f"Highlighted Point")
+
+        if highlighted_ind_x is not None:
+            highlighted_points_x = self.X[highlighted_ind_x]
+            ax.scatter(highlighted_points_x[:, 0], highlighted_points_x[:, 1],
+                       color='red', marker='x', s=120, linewidth=1.5, label="Points where solver failed", alpha=0.8)
 
         ax.axis('equal')
         ax.set(xlim=(self.x_lim[0], self.x_lim[1]), ylim=(self.y_lim[0], self.y_lim[1]))
@@ -120,7 +127,7 @@ class ClassifierPlotter:
 
             for i, (x1, x2) in enumerate(zip(X_diff, X_shifted_diff)):
                 ax.arrow(x1[0], x1[1], x2[0] - x1[0], x2[1] - x1[1], color='orange',
-                         head_width=0.05, head_length=0.1, length_includes_head=True)
+                         head_width=0.05, head_length=0.1, length_includes_head=True, alpha=0.8)
                 ax.scatter(x2[0], x2[1], color=self.label_to_color[y_labels[i]], edgecolor='orange', s=100)
 
                 ax.axis('equal')

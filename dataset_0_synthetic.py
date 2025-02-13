@@ -34,7 +34,7 @@ class main_class:
         self.eps = eps
         self.feature_names = ["Feature1", "Feature2"]
         self.n=n
-        self.threshold=0.5+1e-06
+        self.threshold=0.5+1e-03
 
     def info_comparison(self, moons: bool, linear: bool):
         if moons:
@@ -42,8 +42,8 @@ class main_class:
                                                       num_points=self.n)
         else:
             x_train, x_test, y_train, y_test = synth_data(dimensions=self.dimension_number, random_seed=42, num_points=int(self.n/2))
-        #x_test = x_test[[58, 97, 98]]
-        #y_test = y_test[[58, 97, 98]]
+        #x_test = x_test[[17,18]]
+        #y_test = y_test[[17,18]]
         print("The shape of X train:")
         print(x_train.shape)
 
@@ -56,6 +56,7 @@ class main_class:
         # Train a linear classifier on the data
         if linear:
             f = LinearSVC(dual=False)
+            self.threshold=1e-06
         else:
             print("random forest is applied")
             f = RandomForestClassifier(n_estimators=10, random_state=24)
@@ -93,7 +94,7 @@ class main_class:
 
         # 1. FULL INFORMATION
         bestresponse=Fullinformation(x_test, self.strat_features.tolist())
-        x_test_shifted1 = bestresponse.algorithm2(self.alpha, f, self.t, self.eps, mod_type="model_type", threshold= self.threshold) #add a small threshhold to make it positive for sure
+        x_test_shifted1 = bestresponse.algorithm2(self.alpha, f, self.t, self.eps, mod_type=model_type, threshold= self.threshold) #add a small threshhold to make it positive for sure
 
         #checking if they are orthogonal:
         if linear:
@@ -104,7 +105,9 @@ class main_class:
             print(angle_f)
             print(angles-angle_f)
 
-        plotter2.plot_decision_surface(f, title="1: Full information TEST data with linear SVC decision boundary", X_shifted=x_test_shifted1)
+        ind_failed=bestresponse.get_failed_ind()
+
+        plotter2.plot_decision_surface(f, title="FULL_INFO best responses on linear SVC decision boundary", X_shifted=x_test_shifted1, highlighted_ind_x=ind_failed)
 
         ## check people who changed:
         x_changes=bestresponse.find_differences()
@@ -143,7 +146,7 @@ class main_class:
 
         x_test_shifted2=Lime.algorithm3(f, 0.4, self.alpha, self.eps, mod_type=model_type)
 
-        plotter2.plot_decision_surface(f, title="2: Partial information TEST data with linear SVC decision boundary",
+        plotter2.plot_decision_surface(f, title="PART_INFO best responses with linear SVC decision boundary",
                                        X_shifted=x_test_shifted2)
 
         x_changes2 = Lime.find_differences()
@@ -172,7 +175,7 @@ class main_class:
         alg4=NoInformation(x_test, self.strat_features, self.alpha,  self.eps, y_test=y_train, plotting_ind=1)
 
         x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, int(self.n/100), self.t, threshold=self.threshold)
-        plotter2.plot_decision_surface(f, title="3.1. No information estimation TEST data with linear SVC decision boundary", X_shifted=x_test_shifted3)
+        plotter2.plot_decision_surface(f, title="NO_INFO_EST best responses on linear SVC decision boundary", X_shifted=x_test_shifted3)
 
         x_changes3=alg4.find_differences()
         costs3 = alg4.get_costs()
@@ -198,7 +201,7 @@ class main_class:
         # 3.2. NO INFORMATION - IMITATION
         alg4 = NoInformation(x_test, self.strat_features, self.alpha, self.eps)
         x_test_shifted4=alg4.algorithm4_imitation(x_train,y_train_pred, sigma, 50, self.t)
-        plotter2.plot_decision_surface(f, title="3.2. No information imitation TEST data with linear SVC decision boundary", X_shifted=x_test_shifted4)
+        plotter2.plot_decision_surface(f, title="PART_INFO_IMIT best responses on linear SVC decision boundary", X_shifted=x_test_shifted4)
 
         x_changes4=alg4.find_differences()
         costs4 = alg4.get_costs()
@@ -230,10 +233,10 @@ class main_class:
         ]
         data = {
             "Original": [test_accuracy*100, user_welfare, social_welfare, None, None, None],
-            "1": [test_accuracy_shift1*100, user_welfare_shift1, None, len(x_changes)/len(x_test)*100, avg_cost, avg_cont_payoff],
-            "2": [test_accuracy_shift2*100, user_welfare_shift2, None, len(x_changes2)/len(x_test)*100, avg_cost2, avg_cont_payoff2],
-            "3.1.": [test_accuracy_shift3*100, user_welfare_shift3, None, len(x_changes3)/len(x_test)*100, avg_cost3, avg_cont_payoff3],
-            "3.2.": [test_accuracy_shift4*100, user_welfare_shift4, None, len(x_changes4)/len(x_test)*100, avg_cost4, avg_cont_payoff4]
+            "FULL_INF": [test_accuracy_shift1*100, user_welfare_shift1, None, len(x_changes)/len(x_test)*100, avg_cost, avg_cont_payoff],
+            "PART_INF": [test_accuracy_shift2*100, user_welfare_shift2, None, len(x_changes2)/len(x_test)*100, avg_cost2, avg_cont_payoff2],
+            "NO_INF_EST": [test_accuracy_shift3*100, user_welfare_shift3, None, len(x_changes3)/len(x_test)*100, avg_cost3, avg_cont_payoff3],
+            "NO_INF_IMIT": [test_accuracy_shift4*100, user_welfare_shift4, None, len(x_changes4)/len(x_test)*100, avg_cost4, avg_cont_payoff4]
         }
         df = pd.DataFrame(data, index=index_labels)
 
@@ -250,16 +253,16 @@ class main_class:
 
         # Define the configurations for the plots
         plots = [
-            {"plotter": plotter1, "title": "Original TRAINING data", "data": None},
+            {"plotter": plotter1, "title": "Original TRAINING data", "data": None, "x_points": None},
             {"plotter": plotter2, "title": "1: Full information TEST data shifted",
-             "data": x_test_shifted1},
+             "data": x_test_shifted1, "x_points": ind_failed},
             {"plotter": plotter2, "title": "3.1: No information estimation TEST data shifted",
-             "data": x_test_shifted3},
-            {"plotter": plotter2, "title": "Original TEST data", "data": None},
+             "data": x_test_shifted3, "x_points": None},
+            {"plotter": plotter2, "title": "Original TEST data", "data": None, "x_points": None},
             {"plotter": plotter2, "title": "2: Partial information TEST data shifted",
-             "data": x_test_shifted2},
+             "data": x_test_shifted2, "x_points": None},
             {"plotter": plotter2, "title": "3.2: No information imitation TEST data shifted",
-             "data": x_test_shifted4},
+             "data": x_test_shifted4, "x_points": None},
         ]
 
         # Plot each configuration on the corresponding subplot
@@ -273,6 +276,7 @@ class main_class:
                     f,
                     title=plot_config["title"],
                     X_shifted=plot_config["data"],
+                    highlighted_ind_x=plot_config["x_points"],
                     ax=ax  # Pass the subplot axis
                 )
             else:
@@ -312,12 +316,12 @@ class main_class:
         plt.plot(m_list, errors_pop, label="3.1. No information")
 
         # fully informed case:
-        error_full = 100-self.results["1"]["Accuracy"]
+        error_full = 100-self.results["FULL_INFO"]["Accuracy"]
         error_non = 100-self.results["Original"]["Accuracy"]
-        error_part=100-self.results["2"]["Accuracy"]
-        plt.axhline(y=error_non, color='red', linestyle='--', label="0. Non-strategic")
-        plt.axhline(y=error_full, color='blue', linestyle='-', label="1. Full information")
-        plt.axhline(y=error_part, color='orange', linestyle=':',  label="2. Partial information")
+        error_part=100-self.results["PART_INFO"]["Accuracy"]
+        plt.axhline(y=error_non, color='red', linestyle='--', label="Non-strategic")
+        plt.axhline(y=error_full, color='blue', linestyle='-', label="FULL_INFO")
+        plt.axhline(y=error_part, color='orange', linestyle=':',  label="PART_INFO")
 
         plt.fill_between(
             m_list,  # x values (indices of accuracies_pop)
