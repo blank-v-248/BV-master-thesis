@@ -28,34 +28,39 @@ class main_class:
         self.dimension_number = dimension_number
         self.plotname = "moons_lin.pdf"
         self.tablename = "moons_lin.csv"
-        self.strat_features = np.array([0, 1])
-        self.alpha = np.array([1, 1]).reshape(2, 1)
-        self.t = t
+        self.strat_features = np.array([0, 1, 2, 3, 4, 5])
+        self.alpha = 0.5 * np.array([0.5, 0.5, 1.5, -2.5, -0.5, 0.5]).reshape(6, 1) #np.array([1, 1, 1, 1, 1, 1]).reshape(6, 1)
+        self.t = t/5
         self.eps = eps
         self.feature_names = ["Feature1", "Feature2"]
         self.n=n
         self.threshold=0.5+1e-03
 
-    def info_comparison(self, moons: bool, linear: bool):
+    def info_comparison(self, moons: bool, loan: bool, linear: bool):
         if moons:
             x_train, x_test, y_train, y_test = synth_data_moons(dimensions=self.dimension_number, random_seed=42,
                                                       num_points=self.n)
-        else:
+        elif loan==False:
             x_train, x_test, y_train, y_test = synth_data(dimensions=self.dimension_number, random_seed=42, num_points=int(self.n/2))
-        #x_test = x_test[[17,18]]
-        #y_test = y_test[[17,18]]
+        else:
+            x_train, x_test, y_train, y_test = loan_data(train_val=True)
+
+
+        #x_test = x_test[:20]
+        #y_test = y_test[:20]
         print("The shape of X train:")
         print(x_train.shape)
 
         # Plot original dataset:
-        plotter1=ClassifierPlotter(x_train, y_train, x_lim=[-3,3], y_lim=[-3,3])
-        plotter1.plot_orig_dataset(title="Original TRAINING data")
-        plotter2=ClassifierPlotter(x_test, y_test, x_lim=[-3,3], y_lim=[-3,3])
-        plotter2.plot_orig_dataset(title="Original TEST data")
+        if not loan:
+            plotter1=ClassifierPlotter(x_train, y_train, x_lim=[-3,3], y_lim=[-3,3])
+            plotter1.plot_orig_dataset(title="Original TRAINING data")
+            plotter2=ClassifierPlotter(x_test, y_test, x_lim=[-3,3], y_lim=[-3,3])
+            plotter2.plot_orig_dataset(title="Original TEST data")
 
         # Train a linear classifier on the data
         if linear:
-            f = LinearSVC(dual=False)
+            f = LinearSVC(C=0.01, penalty='l2', random_state=42)
             self.threshold=1e-06
         else:
             print("random forest is applied")
@@ -69,8 +74,9 @@ class main_class:
             f.decision_function(x_test)
 
         # Plot the decision surface
-        plotter1.plot_decision_surface(f, title="Original TRAINING data with linear SVC decision boundary")
-        plotter2.plot_decision_surface(f, title="Original TEST data with linear SVC decision boundary")
+        if not loan:
+            plotter1.plot_decision_surface(f, title="Original TRAINING data with linear SVC decision boundary")
+            plotter2.plot_decision_surface(f, title="Original TEST data with linear SVC decision boundary")
 
         #  Extract and save the coefficient weights to w_f
         if linear:
@@ -101,13 +107,11 @@ class main_class:
             diff_vectors = x_test_shifted1 - x_test
             angles = np.degrees(np.arctan2(diff_vectors[:, 1], diff_vectors[:, 0]))
             angle_f=np.degrees(np.arctan2(w_f[0][1],w_f[0][0]))
-            print(angles)
-            print(angle_f)
-            print(angles-angle_f)
 
         ind_failed=bestresponse.get_failed_ind()
 
-        plotter2.plot_decision_surface(f, title="FULL_INFO best responses on linear SVC decision boundary", X_shifted=x_test_shifted1, highlighted_ind_x=ind_failed)
+        if not loan:
+            plotter2.plot_decision_surface(f, title="FULL_INFO best responses on linear SVC decision boundary", X_shifted=x_test_shifted1, highlighted_ind_x=ind_failed)
 
         ## check people who changed:
         x_changes=bestresponse.find_differences()
@@ -146,7 +150,8 @@ class main_class:
 
         x_test_shifted2=Lime.algorithm3(f, 0.4, self.alpha, self.eps, mod_type=model_type)
 
-        plotter2.plot_decision_surface(f, title="PART_INFO best responses with linear SVC decision boundary",
+        if not loan:
+            plotter2.plot_decision_surface(f, title="PART_INFO best responses with linear SVC decision boundary",
                                        X_shifted=x_test_shifted2)
 
         x_changes2 = Lime.find_differences()
@@ -175,13 +180,16 @@ class main_class:
         alg4=NoInformation(x_test, self.strat_features, self.alpha,  self.eps, y_test=y_train, plotting_ind=1)
 
         x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, int(self.n/100), self.t, threshold=self.threshold)
-        plotter2.plot_decision_surface(f, title="NO_INFO_EST best responses on linear SVC decision boundary", X_shifted=x_test_shifted3)
+
+        if not loan:
+            plotter2.plot_decision_surface(f, title="NO_INFO_EST best responses on linear SVC decision boundary", X_shifted=x_test_shifted3)
 
         x_changes3=alg4.find_differences()
         costs3 = alg4.get_costs()
         avg_cost3 = np.sum(costs3) / len(x_changes3)
 
-        alg4.plot_sample()
+        if not loan:
+            alg4.plot_sample()
 
         y_test_pred_shifted3=f.predict(x_test_shifted3)
         user_welfare_shift3=np.sum(y_test_pred_shifted3 == 1) / len(y_test_pred_shifted3) * 100
@@ -201,7 +209,9 @@ class main_class:
         # 3.2. NO INFORMATION - IMITATION
         alg4 = NoInformation(x_test, self.strat_features, self.alpha, self.eps)
         x_test_shifted4=alg4.algorithm4_imitation(x_train,y_train_pred, sigma, 50, self.t)
-        plotter2.plot_decision_surface(f, title="PART_INFO_IMIT best responses on linear SVC decision boundary", X_shifted=x_test_shifted4)
+
+        if not loan:
+            plotter2.plot_decision_surface(f, title="PART_INFO_IMIT best responses on linear SVC decision boundary", X_shifted=x_test_shifted4)
 
         x_changes4=alg4.find_differences()
         costs4 = alg4.get_costs()
@@ -245,56 +255,57 @@ class main_class:
         self.results=df
         df.to_csv(f"outputs/{self.tablename}", index=True, float_format='%.2f')
 
-        # Create a 2x3 grid for the subplots
-        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        if not loan:
+            # Create a 2x3 grid for the subplots
+            fig, axes = plt.subplots(2, 3, figsize=(15, 10))
 
-        # Flatten axes for easier indexing
-        axes = axes.flatten()
+            # Flatten axes for easier indexing
+            axes = axes.flatten()
 
-        # Define the configurations for the plots
-        plots = [
-            {"plotter": plotter1, "title": "Original TRAINING data", "data": None, "x_points": None},
-            {"plotter": plotter2, "title": "1: Full information TEST data shifted",
-             "data": x_test_shifted1, "x_points": ind_failed},
-            {"plotter": plotter2, "title": "3.1: No information estimation TEST data shifted",
-             "data": x_test_shifted3, "x_points": None},
-            {"plotter": plotter2, "title": "Original TEST data", "data": None, "x_points": None},
-            {"plotter": plotter2, "title": "2: Partial information TEST data shifted",
-             "data": x_test_shifted2, "x_points": None},
-            {"plotter": plotter2, "title": "3.2: No information imitation TEST data shifted",
-             "data": x_test_shifted4, "x_points": None},
-        ]
+            # Define the configurations for the plots
+            plots = [
+                {"plotter": plotter1, "title": "Original TRAINING data", "data": None, "x_points": None},
+                {"plotter": plotter2, "title": "1: Full information TEST data shifted",
+                 "data": x_test_shifted1, "x_points": ind_failed},
+                {"plotter": plotter2, "title": "3.1: No information estimation TEST data shifted",
+                 "data": x_test_shifted3, "x_points": None},
+                {"plotter": plotter2, "title": "Original TEST data", "data": None, "x_points": None},
+                {"plotter": plotter2, "title": "2: Partial information TEST data shifted",
+                 "data": x_test_shifted2, "x_points": None},
+                {"plotter": plotter2, "title": "3.2: No information imitation TEST data shifted",
+                 "data": x_test_shifted4, "x_points": None},
+            ]
 
-        # Plot each configuration on the corresponding subplot
-        for i, plot_config in enumerate(plots):
-            ax = axes[i]  # Get the corresponding subplot axis
-            plotter = plot_config["plotter"]  # Determine which plotter to use
+            # Plot each configuration on the corresponding subplot
+            for i, plot_config in enumerate(plots):
+                ax = axes[i]  # Get the corresponding subplot axis
+                plotter = plot_config["plotter"]  # Determine which plotter to use
 
-            # Call the appropriate function with the axis
-            if plot_config["data"] is not None:
-                plotter.plot_decision_surface(
-                    f,
-                    title=plot_config["title"],
-                    X_shifted=plot_config["data"],
-                    highlighted_ind_x=plot_config["x_points"],
-                    ax=ax  # Pass the subplot axis
-                )
-            else:
-                plotter.plot_decision_surface(
-                    f,
-                    title=plot_config["title"],
-                    ax=ax  # Pass the subplot axis
-                )
+                # Call the appropriate function with the axis
+                if plot_config["data"] is not None:
+                    plotter.plot_decision_surface(
+                        f,
+                        title=plot_config["title"],
+                        X_shifted=plot_config["data"],
+                        highlighted_ind_x=plot_config["x_points"],
+                        ax=ax  # Pass the subplot axis
+                    )
+                else:
+                    plotter.plot_decision_surface(
+                        f,
+                        title=plot_config["title"],
+                        ax=ax  # Pass the subplot axis
+                    )
 
-        # Adjust layout for better spacing
-        plt.tight_layout()
-        plt.subplots_adjust(hspace=0.2)
+            # Adjust layout for better spacing
+            plt.tight_layout()
+            plt.subplots_adjust(hspace=0.2)
 
-        # Save the final figure
-        plt.savefig(f"outputs/{self.plotname}")
+            # Save the final figure
+            plt.savefig(f"outputs/{self.plotname}")
 
-        # Display the plot
-        plt.show()
+            # Display the plot
+            plt.show()
 
         # save relevant information to self:
         self.x_test=np.copy(x_test)
@@ -302,7 +313,8 @@ class main_class:
         self.y_test=np.copy(y_test)
 
     def pop_plotter(self):
-        m_list = [self.n * (i*5 / 100) for i in range(1, 19)]
+        #m_list = [self.n * (i*5 / 100) for i in range(1, 19)]
+        m_list = [4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
         # 3.1. NO INFORMATION - UTILITY MAXIMIZATION with different sample sizes
         sigma = 1.0  # Bandwidth parameter for weigthed sampling
         y_train_pred=self.initial_model.predict(self.x_train)
@@ -313,15 +325,15 @@ class main_class:
             x_test_shifted3=alg4.algorithm4_utility(self.x_train, y_train_pred, sigma, int(m), 2*self.t, threshold=self.threshold )
             y_test_pred_shifted3=self.initial_model.predict(x_test_shifted3)
             errors_pop.append(100-accuracy_score(self.y_test, y_test_pred_shifted3)*100)
-        plt.plot(m_list, errors_pop, label="3.1. No information")
+        plt.plot(m_list, errors_pop, label="NO_INF_EST")
 
         # fully informed case:
-        error_full = 100-self.results["FULL_INFO"]["Accuracy"]
+        error_full = 100-self.results["FULL_INF"]["Accuracy"]
         error_non = 100-self.results["Original"]["Accuracy"]
-        error_part=100-self.results["PART_INFO"]["Accuracy"]
+        error_part=100-self.results["PART_INF"]["Accuracy"]
         plt.axhline(y=error_non, color='red', linestyle='--', label="Non-strategic")
-        plt.axhline(y=error_full, color='blue', linestyle='-', label="FULL_INFO")
-        plt.axhline(y=error_part, color='orange', linestyle=':',  label="PART_INFO")
+        plt.axhline(y=error_full, color='blue', linestyle='-', label="FULL_INF")
+        plt.axhline(y=error_part, color='orange', linestyle=':',  label="PART_INF")
 
         plt.fill_between(
             m_list,  # x values (indices of accuracies_pop)
@@ -340,7 +352,9 @@ class main_class:
         plt.title("Errors in different information scenarios")
         plt.legend()
 
-        plt.xlim(m_list[0],m_list[(len(m_list)-1)])
+        plt.xscale("log")
+
+        plt.xlim(m_list[0], m_list[-1])
 
         plt.savefig(f"outputs/moons_lin_pop.pdf")
 
@@ -362,6 +376,8 @@ if __name__ == "__main__":
                         help="If set, the moons dataset is used. Otherwise, synthetic data has Gaussian clusters.")
     parser.add_argument("--linear", action="store_true",
                         help="If set, a linear SVC classifier is used. Otherwise, a kernelized SVC is applied.")
+    parser.add_argument("--loan", action="store_true",
+                        help="If set, the loans dataset is used. Otherwise, a synthetic dataset is used.")
 
     args = parser.parse_args()
 
@@ -372,5 +388,5 @@ if __name__ == "__main__":
         eps=args.eps,
     )
 
-    processor.info_comparison(moons=args.moons, linear=args.linear)
+    processor.info_comparison(moons=args.moons, linear=args.linear, loan=args.loan)
     processor.pop_plotter()

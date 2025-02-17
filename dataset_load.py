@@ -2,6 +2,7 @@ import numpy as np
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import make_moons
+import pandas as pd
 
 def synth_data(dimensions=2, num_points=100, random_seed=24):
     if dimensions != 2:
@@ -31,7 +32,6 @@ def synth_data(dimensions=2, num_points=100, random_seed=24):
         # Standardize the features
         std_scaler = preprocessing.StandardScaler()
         X = std_scaler.fit_transform(X)
-        print("hihihi")
         # Split the data into train and test sets with an 80-20% ratio
         x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=random_seed)
 
@@ -64,6 +64,26 @@ def synth_data_moons(dimensions, random_seed, num_points):
     )
 
     return x_train, x_test, y_train, y_test
+
+def loan_data(train_val: bool = False):
+    six_most_significant_features = ['AvailableBankcardCredit', 'LoanOriginalAmount',
+                                     'TradesNeverDelinquent(percentage)',
+                                     'BankcardUtilization', 'TotalInquiries', 'CreditHistoryLength']
+    if train_val:
+        x_train0 = pd.read_csv('data/train_val_pre2009_f_star_loan_status.csv')
+    else:
+        x_train0=pd.read_csv('data/train_pre2009_f_star_loan_status.csv')
+    x_train=x_train0[six_most_significant_features].to_numpy()
+    y_train=x_train0["LoanStatus"].to_numpy()
+    y_train[y_train == -1] = 0
+
+    x_test0=pd.read_csv('data/test_pre2009_f_star_loan_status.csv')
+    x_test=x_test0[six_most_significant_features].to_numpy()
+    y_test=x_test0["LoanStatus"].to_numpy()
+    y_test[y_test == -1] = 0
+
+    return x_train, x_test, y_train, y_test
+
 
 
 
