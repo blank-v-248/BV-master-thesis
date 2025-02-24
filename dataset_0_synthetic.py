@@ -26,30 +26,35 @@ warnings.filterwarnings(action='ignore', category=DataConversionWarning)
 class main_class:
     def __init__(self, dimension_number: int, n: int, t: float, eps : float) -> None:
         self.dimension_number = dimension_number
-        self.plotname = "moons_lin.pdf"
-        self.tablename = "moons_lin.csv"
-        self.strat_features = np.array([0, 1, 2, 3, 4, 5])
-        self.alpha = 0.5 * np.array([0.5, 0.5, 1.5, -2.5, -0.5, 0.5]).reshape(6, 1) #np.array([1, 1, 1, 1, 1, 1]).reshape(6, 1)
         self.t = t/5
         self.eps = eps
         self.feature_names = ["Feature1", "Feature2"]
         self.n=n
         self.threshold=0.5+1e-03
 
-    def info_comparison(self, moons: bool, loan: bool, linear: bool):
+    def info_comparison(self, moons: bool, loan: bool, model_type: str):
         if moons:
             x_train, x_test, y_train, y_test = synth_data_moons(dimensions=self.dimension_number, random_seed=42,
                                                       num_points=self.n)
+            self.strat_features = np.array([0, 1])
+            self.alpha = 0.5 * np.array([0.5, 0.5]).reshape(2,1)
         elif loan==False:
             x_train, x_test, y_train, y_test = synth_data(dimensions=self.dimension_number, random_seed=42, num_points=int(self.n/2))
+            self.strat_features = np.array([0, 1])
+            self.alpha = 0.5 * np.array([0.5, 0.5]).reshape(2,1)
         else:
             x_train, x_test, y_train, y_test = loan_data(train_val=True)
+            self.strat_features = np.array([0, 1, 2, 3, 4, 5])
+            self.alpha = 0.5 * np.array([0.5, 0.5, 1.5, -2.5, -0.5, 0.5]).reshape(6, 1)
 
 
         #x_test = x_test[:20]
         #y_test = y_test[:20]
         print("The shape of X train:")
         print(x_train.shape)
+
+        print("The shape of X test:")
+        print(x_test.shape)
 
         # Plot original dataset:
         if not loan:
@@ -59,18 +64,24 @@ class main_class:
             plotter2.plot_orig_dataset(title="Original TEST data")
 
         # Train a linear classifier on the data
-        if linear:
-            f = LinearSVC(C=0.01, penalty='l2', random_state=42)
-            self.threshold=1e-06
-        else:
+        if model_type=="rnf":
             print("random forest is applied")
             f = RandomForestClassifier(n_estimators=10, random_state=24)
-            #f = MLPClassifier(hidden_layer_sizes=(10,10,10), activation='relu', solver='adam', max_iter=1000, random_state=24)
-            #f=KNeighborsClassifier(n_neighbors=11)
+        elif model_type=="nn":
+            print("Neural network is applied")
+            f = MLPClassifier(hidden_layer_sizes=(10,10,10,10), activation='relu', solver='adam', max_iter=1000, random_state=24)
+        elif model_type=="knn":
+            print("K-nearest neighbors classifier is applied")
+            f=KNeighborsClassifier(n_neighbors=11)
+        else:
+            print("Linear model is applied")
+            f = LinearSVC(C=0.01, penalty='l2', random_state=42)
+            self.threshold = 1e-06
+
         f.fit(x_train, y_train)
         self.initial_model = copy.deepcopy(f)
 
-        if linear:
+        if model_type=="linear":
             f.decision_function(x_test)
 
         # Plot the decision surface
@@ -79,7 +90,7 @@ class main_class:
             plotter2.plot_decision_surface(f, title="Original TEST data with linear SVC decision boundary")
 
         #  Extract and save the coefficient weights to w_f
-        if linear:
+        if model_type=="linear":
          w_f = f.coef_
 
         # Get accuracies:
@@ -91,19 +102,19 @@ class main_class:
 
         # Display the coefficient weights
         print("--Original model--")
-        if linear:
+        if model_type=="linear":
             print("Coefficient weights w_f:", w_f)
         print("Training accuracy:", train_accuracy)
         print("Test accuracy:", test_accuracy)
 
-        model_type = "dec_f" if linear else "pred_proba"
+        model_type = "dec_f" if model_type=="linear" else "pred_proba"
 
         # 1. FULL INFORMATION
         bestresponse=Fullinformation(x_test, self.strat_features.tolist())
         x_test_shifted1 = bestresponse.algorithm2(self.alpha, f, self.t, self.eps, mod_type=model_type, threshold= self.threshold) #add a small threshhold to make it positive for sure
 
         #checking if they are orthogonal:
-        if linear:
+        if model_type=="linear":
             diff_vectors = x_test_shifted1 - x_test
             angles = np.degrees(np.arctan2(diff_vectors[:, 1], diff_vectors[:, 0]))
             angle_f=np.degrees(np.arctan2(w_f[0][1],w_f[0][0]))
@@ -207,11 +218,12 @@ class main_class:
         print("Average contestant payoff:", avg_cont_payoff3)
 
         # 3.2. NO INFORMATION - IMITATION
-        alg4 = NoInformation(x_test, self.strat_features, self.alpha, self.eps)
-        x_test_shifted4=alg4.algorithm4_imitation(x_train,y_train_pred, sigma, 50, self.t)
+        alg4 = NoInformation(x_test, self.strat_features, self.alpha, self.eps, plotting_ind=1)
+        x_test_shifted4=alg4.algorithm4_imitation(x_train,y_train_pred, sigma, 50, self.t, f=f)
 
         if not loan:
-            plotter2.plot_decision_surface(f, title="PART_INFO_IMIT best responses on linear SVC decision boundary", X_shifted=x_test_shifted4)
+            plotter2.plot_decision_surface(f, title="NO_INFO_IMIT best responses on linear SVC decision boundary", X_shifted=x_test_shifted4)
+            alg4.plot_sample()
 
         x_changes4=alg4.find_differences()
         costs4 = alg4.get_costs()
@@ -243,17 +255,19 @@ class main_class:
         ]
         data = {
             "Original": [test_accuracy*100, user_welfare, social_welfare, None, None, None],
-            "FULL_INF": [test_accuracy_shift1*100, user_welfare_shift1, None, len(x_changes)/len(x_test)*100, avg_cost, avg_cont_payoff],
-            "PART_INF": [test_accuracy_shift2*100, user_welfare_shift2, None, len(x_changes2)/len(x_test)*100, avg_cost2, avg_cont_payoff2],
-            "NO_INF_EST": [test_accuracy_shift3*100, user_welfare_shift3, None, len(x_changes3)/len(x_test)*100, avg_cost3, avg_cont_payoff3],
-            "NO_INF_IMIT": [test_accuracy_shift4*100, user_welfare_shift4, None, len(x_changes4)/len(x_test)*100, avg_cost4, avg_cont_payoff4]
+            "FULL\_INF": [test_accuracy_shift1*100, user_welfare_shift1, None, len(x_changes)/len(x_test)*100, avg_cost, avg_cont_payoff],
+            "PART\_INF": [test_accuracy_shift2*100, user_welfare_shift2, None, len(x_changes2)/len(x_test)*100, avg_cost2, avg_cont_payoff2],
+            "NO\_INF_EST": [test_accuracy_shift3*100, user_welfare_shift3, None, len(x_changes3)/len(x_test)*100, avg_cost3, avg_cont_payoff3],
+            "NO\_INF_IMIT": [test_accuracy_shift4*100, user_welfare_shift4, None, len(x_changes4)/len(x_test)*100, avg_cost4, avg_cont_payoff4]
         }
         df = pd.DataFrame(data, index=index_labels)
+
+        df = df.drop(df.index[2]) # drop social welfare
 
         print(df)
 
         self.results=df
-        df.to_csv(f"outputs/{self.tablename}", index=True, float_format='%.2f')
+        df.to_csv(f"outputs/{dataset_name}_{tablename}.csv", index=True, float_format='%.2f')
 
         if not loan:
             # Create a 2x3 grid for the subplots
@@ -264,15 +278,15 @@ class main_class:
 
             # Define the configurations for the plots
             plots = [
-                {"plotter": plotter1, "title": "Original TRAINING data", "data": None, "x_points": None},
-                {"plotter": plotter2, "title": "1: Full information TEST data shifted",
+                {"plotter": plotter1, "title": "Original TRAINING data with trained decision boundary", "data": None, "x_points": None},
+                {"plotter": plotter2, "title": "1: FULL_INFO best responses",
                  "data": x_test_shifted1, "x_points": ind_failed},
-                {"plotter": plotter2, "title": "3.1: No information estimation TEST data shifted",
+                {"plotter": plotter2, "title": "3.1: NO_INFO_EST best responses",
                  "data": x_test_shifted3, "x_points": None},
                 {"plotter": plotter2, "title": "Original TEST data", "data": None, "x_points": None},
-                {"plotter": plotter2, "title": "2: Partial information TEST data shifted",
+                {"plotter": plotter2, "title": "2: PART_INFO best responses",
                  "data": x_test_shifted2, "x_points": None},
-                {"plotter": plotter2, "title": "3.2: No information imitation TEST data shifted",
+                {"plotter": plotter2, "title": "NO_INFO_IMIT best responses",
                  "data": x_test_shifted4, "x_points": None},
             ]
 
@@ -302,7 +316,7 @@ class main_class:
             plt.subplots_adjust(hspace=0.2)
 
             # Save the final figure
-            plt.savefig(f"outputs/{self.plotname}")
+            plt.savefig(f"outputs/{dataset_name}_{plotname1}.pdf")
 
             # Display the plot
             plt.show()
@@ -312,9 +326,11 @@ class main_class:
         self.x_train = np.copy(x_train)
         self.y_test=np.copy(y_test)
 
-    def pop_plotter(self):
-        #m_list = [self.n * (i*5 / 100) for i in range(1, 19)]
-        m_list = [4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
+    def pop_plotter(self, loan: bool):
+        if loan:
+            m_list = [4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
+        else:
+            m_list = [4, 8, 16, 32, 64, 128, 256, 512, 1024]
         # 3.1. NO INFORMATION - UTILITY MAXIMIZATION with different sample sizes
         sigma = 1.0  # Bandwidth parameter for weigthed sampling
         y_train_pred=self.initial_model.predict(self.x_train)
@@ -328,9 +344,9 @@ class main_class:
         plt.plot(m_list, errors_pop, label="NO_INF_EST")
 
         # fully informed case:
-        error_full = 100-self.results["FULL_INF"]["Accuracy"]
+        error_full = 100-self.results["FULL\_INF"]["Accuracy"]
         error_non = 100-self.results["Original"]["Accuracy"]
-        error_part=100-self.results["PART_INF"]["Accuracy"]
+        error_part=100-self.results["PART\_INF"]["Accuracy"]
         plt.axhline(y=error_non, color='red', linestyle='--', label="Non-strategic")
         plt.axhline(y=error_full, color='blue', linestyle='-', label="FULL_INF")
         plt.axhline(y=error_part, color='orange', linestyle=':',  label="PART_INF")
@@ -347,6 +363,21 @@ class main_class:
             linewidth = 0.0
         )
 
+        #Adding POP arrow annotation
+        m_value = 8
+        plt.annotate(
+            '',
+            xy=(m_value, errors_pop[1]),  # Arrowhead location
+            xytext=(m_value, error_full),  # Arrow tail location
+            arrowprops=dict(arrowstyle='<->', color='black', linewidth=1.5)  # Double-headed vertical arrow
+        )
+
+        text = "+POP" if errors_pop[1]-error_full>0 else "-POP"
+
+        # Optionally, label the arrow
+        plt.text(m_value + 0.5, (error_full +  errors_pop[1]) / 2, text,
+                 verticalalignment='center', fontsize=12)
+
         plt.xlabel("m (sample size)")
         plt.ylabel("Error [%]")
         plt.title("Errors in different information scenarios")
@@ -356,7 +387,7 @@ class main_class:
 
         plt.xlim(m_list[0], m_list[-1])
 
-        plt.savefig(f"outputs/moons_lin_pop.pdf")
+        plt.savefig(f"outputs/{dataset_name}_{plotname2}.pdf")
 
         plt.show()
 
@@ -366,20 +397,40 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dimension_number", type=int, default=2,
                     help="Number of dimensions for synthetic data.")
-    parser.add_argument("--n", type=int, default=400,
+    parser.add_argument("--n", type=int, default=1138,
                         help="Number of datapoints in total for synthetic data. 10% test, 90% training split.")
-    parser.add_argument("--t", type=float, default=2,
+    parser.add_argument("--t", type=float, default=1,
                         help="Controls the budget for changes. The higher t, the higher costs users are willing to pay.")
-    parser.add_argument("--eps", type=float, default=2,
+    parser.add_argument("--eps", type=float, default=0.2,
                         help="The weight of the quadratic element in the mixed cost function.")
     parser.add_argument("--moons", action="store_true",
                         help="If set, the moons dataset is used. Otherwise, synthetic data has Gaussian clusters.")
-    parser.add_argument("--linear", action="store_true",
-                        help="If set, a linear SVC classifier is used. Otherwise, a kernelized SVC is applied.")
+    parser.add_argument("--model_type", type=str, default="linear", choices=["linear", "nn", "knn", "rnf"],
+        help="Choose model type. Default: linear. Other options: nn, knn, and rnf."
+    )
     parser.add_argument("--loan", action="store_true",
                         help="If set, the loans dataset is used. Otherwise, a synthetic dataset is used.")
 
     args = parser.parse_args()
+
+    # Set plotnames
+    if args.model_type == "nn":
+        plotname1 = "nn"
+        plotname2 = "nn_pop"
+        tablename = "nn"
+    elif args.model_type == "knn":
+        plotname1 = "knn"
+        plotname2 = "knn_pop"
+        tablename = "knn"
+    elif args.model_type == "rnf":
+        plotname1 = "rnf"
+        plotname2 = "rnf_pop"
+        tablename = "rnf"
+    else: # default is linear model
+        plotname1 = "lin"
+        plotname2 = "lin_pop"
+        tablename = "lin"
+    dataset_name= "loan" if args.loan else "moons" if args.moons else "circ"
 
     processor = main_class(
         dimension_number=args.dimension_number,
@@ -388,5 +439,5 @@ if __name__ == "__main__":
         eps=args.eps,
     )
 
-    processor.info_comparison(moons=args.moons, linear=args.linear, loan=args.loan)
-    processor.pop_plotter()
+    processor.info_comparison(moons=args.moons, model_type=args.model_type, loan=args.loan)
+    processor.pop_plotter(loan=args.loan)

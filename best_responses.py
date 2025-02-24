@@ -228,7 +228,7 @@ class NoInformation:
         elif beta_1 > 0: # otherwise take biggest change possible
             return min(beta_1, 1)
 
-    def algorithm4_imitation(self, X_train, y_train_pred, sigma,m, t):
+    def algorithm4_imitation(self, X_train, y_train_pred, sigma,m, t, f=None):
         ws = WeightedSampler(X_train, sigma, y_train_pred)
         cost_func = MixWeightedLinearSumSquareCostFunction(self.alpha, self.eps)
         n = (self.X_test.shape[0])
@@ -249,6 +249,13 @@ class NoInformation:
             x_shifted[ind, ]=beta_star*x+(1-beta_star)*x_p #shift into users direction
 
             costs.append(cost_func(x_shifted[ind], x))
+
+            #Save results for plotting:
+            if ind==self.plotting_ind:
+                self.x_plotting = np.vstack((x, T_c))
+                self.y_plotting = y_train_pred[np.hstack((ind, ind_c))]
+                self.model_plotting = f
+                self.x_shifted_plotting=np.vstack((x_shifted[0], T_c))
 
         self.costs=np.copy(costs)
         self.X_shifted=np.copy(x_shifted)

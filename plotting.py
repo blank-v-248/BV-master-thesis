@@ -34,7 +34,13 @@ class ClassifierPlotter:
 
 
         # Map the labels to colors
-        self.label_to_color = {self.unique_labels[0]: colors[0], self.unique_labels[1]: colors[1]}
+        if len(self.unique_labels) == 1:
+            if self.unique_labels[0] == 0:
+                self.label_to_color = {self.unique_labels[0]: colors[0]}
+            else:
+                self.label_to_color = {self.unique_labels[0]: colors[1]}
+        else:
+            self.label_to_color = {self.unique_labels[0]: colors[0], self.unique_labels[1]: colors[1]}
         self.x_lim=x_lim
 
 
