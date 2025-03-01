@@ -117,7 +117,7 @@ class Fullinformation:
                 self.costs[i] = cost_func(opt_strat_x, x0_strat)
 
                 # Update X_strat based on the cost constraint: only change, if change does not too costly = feasible
-                if self.costs[i]<2*t:
+                if self.costs[i]<=2*t:
                     X_strat[i, self.strat_features] = opt_strat_x
                 else:
                     self.costs[i] = 0
@@ -211,7 +211,7 @@ class NoInformation:
         B = (1 - self.eps) * self.alpha.T @ (x-x_p)
 
         # Compute the discriminant
-        discriminant = B ** 2 + 8 * A * t
+        discriminant = B ** 2 + 4 * A * t
 
         # Ensure the discriminant is non-negative
         assert discriminant >= 0, f"Discriminant is negative, no real solutions for beta. Problematic index: {i}" # D has to be non-negative
@@ -219,8 +219,8 @@ class NoInformation:
         # Calculate the two possible beta values
         sqrt_discriminant = np.sqrt(discriminant)
 
-        beta_1 = 1 - (-B + sqrt_discriminant) / (2 * A)
-        beta_2 = 1 - (-B - sqrt_discriminant) / (2 * A) # the larger beta should always be larger than 1 (beta=1 means no change, should be feasible)
+        beta_1 = (-B - sqrt_discriminant) / (2 * A) + 1
+        beta_2 = (-B + sqrt_discriminant) / (2 * A) + 1 # the larger beta should always be larger than 1 (beta=1 means no change, should be feasible)
         assert beta_2 >= 1, "Beta=1 not feasible" # if beta_2 < 1 not feasible solution
         # Pick the beta that is within [0, 1]
         if beta_1 <= 0: # if total change possible, take beta=0 (x shifts to x_p)

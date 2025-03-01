@@ -41,15 +41,15 @@ class main_class:
         elif loan==False:
             x_train, x_test, y_train, y_test = synth_data(dimensions=self.dimension_number, random_seed=42, num_points=int(self.n/2))
             self.strat_features = np.array([0, 1])
-            self.alpha = 0.5 * np.array([0.5, 0.5]).reshape(2,1)
+            self.alpha = np.array([0.5, 0.5]).reshape(2,1)
         else:
             x_train, x_test, y_train, y_test = loan_data(train_val=True)
             self.strat_features = np.array([0, 1, 2, 3, 4, 5])
             self.alpha = 0.5 * np.array([0.5, 0.5, 1.5, -2.5, -0.5, 0.5]).reshape(6, 1)
 
 
-        #x_test = x_test[:20]
-        #y_test = y_test[:20]
+        x_test = x_test[2:]
+        y_test = y_test[2:]
         print("The shape of X train:")
         print(x_train.shape)
 
@@ -175,6 +175,11 @@ class main_class:
 
         avg_cont_payoff2=np.sum(self.t*y_test_pred_shifted2-costs2)/len(y_test_pred_shifted2)
 
+        # Get disagreement set:
+        y_test_pred_shifted2_user= Lime.est_pred_after()
+        disagreement_set_2=np.where(y_test_pred_shifted2_user != y_test_pred_shifted2)
+        size_of_dis_set_2 = len(disagreement_set_2[0])
+
         print("--")
         print("--2. Partial information--")
         print("Number of users who changed:", len(x_changes2), " in %:", len(x_changes2)/len(x_test)*100, "%")
@@ -183,6 +188,7 @@ class main_class:
         #print("Social welfare after shift:", social_welfare_shift1, "%")
         print("User welfare after shift:", user_welfare_shift2, "%")
         print("Average contestant payoff:", avg_cont_payoff2)
+        print("The size of disagreement set:", size_of_dis_set_2, "%:", size_of_dis_set_2/len(y_test_pred_shifted2))
 
 
         # 3.1. NO INFORMATION - UTILITY MAXIMIZATION
@@ -208,6 +214,11 @@ class main_class:
 
         avg_cont_payoff3 = np.sum(self.t * y_test_pred_shifted3 - costs3) / len(y_test_pred_shifted3)
 
+        # Get disagreement set:
+        y_test_pred_shifted3_user= alg4.est_pred_after()
+        disagreement_set_3=np.where(y_test_pred_shifted3_user != y_test_pred_shifted3)
+        size_of_dis_set_3 = len(disagreement_set_3[0])
+
         print("--")
         print("--3.1. No information, utility maximalization--")
         print("Number of users who changed:", len(x_changes3), " in %:", len(x_changes3)/len(x_test)*100, "%")
@@ -216,10 +227,11 @@ class main_class:
         #print("Social welfare after shift:", social_welfare_shift1, "%")
         print("User welfare after shift:", user_welfare_shift3, "%")
         print("Average contestant payoff:", avg_cont_payoff3)
+        print("The size of disagreement set:", size_of_dis_set_3, "%:", size_of_dis_set_3/len(y_test_pred_shifted3))
 
         # 3.2. NO INFORMATION - IMITATION
         alg4 = NoInformation(x_test, self.strat_features, self.alpha, self.eps, plotting_ind=1)
-        x_test_shifted4=alg4.algorithm4_imitation(x_train,y_train_pred, sigma, 50, self.t, f=f)
+        x_test_shifted4=alg4.algorithm4_imitation(x_train,y_train_pred, sigma, 50, 2*self.t, f=f)
 
         if not loan:
             plotter2.plot_decision_surface(f, title="NO_INFO_IMIT best responses on linear SVC decision boundary", X_shifted=x_test_shifted4)
@@ -235,6 +247,7 @@ class main_class:
 
         avg_cont_payoff4 = np.sum(self.t * y_test_pred_shifted4 - costs4) / len(y_test_pred_shifted4)
 
+
         print("--")
         print("--3.2. No information, imitation--")
         print("Number of users who changed:", len(x_changes4), " in %:", len(x_changes4)/len(x_test)*100, "%")
@@ -243,6 +256,15 @@ class main_class:
         #print("Social welfare after shift:", social_welfare_shift1, "%")
         print("User welfare after shift:", user_welfare_shift4, "%")
         print("Average contestant payoff:", avg_cont_payoff4)
+
+        # Get the enlargement set:
+        all_match = (y_test_pred_shifted1 == y_test_pred_shifted2) & (y_test_pred_shifted1 == y_test_pred_shifted3) & (
+                    y_test_pred_shifted1 == y_test_pred_shifted4)
+
+        # Find indices where not all match (i.e., where the condition is False)
+        indices_not_matching = np.where(~all_match)[0]
+        print("--")
+        print("The size of the enlargement set:", len(indices_not_matching), "%:", len(indices_not_matching)/len(y_test_pred_shifted4))
 
         # Create table overview:
         index_labels = [
