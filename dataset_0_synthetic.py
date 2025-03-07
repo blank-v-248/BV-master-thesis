@@ -48,8 +48,6 @@ class main_class:
             self.alpha = 0.5 * np.array([0.5, 0.5, 1.5, -2.5, -0.5, 0.5]).reshape(6, 1)
 
 
-        x_test = x_test[2:]
-        y_test = y_test[2:]
         print("The shape of X train:")
         print(x_train.shape)
 
@@ -86,8 +84,8 @@ class main_class:
 
         # Plot the decision surface
         if not loan:
-            plotter1.plot_decision_surface(f, title="Original TRAINING data with linear SVC decision boundary")
-            plotter2.plot_decision_surface(f, title="Original TEST data with linear SVC decision boundary")
+            plotter1.plot_decision_surface(f, title=f"Original TRAINING data with {args.model_type.upper()} decision boundary")
+            plotter2.plot_decision_surface(f, title=f"Original TEST data with {args.model_type.upper()} decision boundary")
 
         #  Extract and save the coefficient weights to w_f
         if model_type=="linear":
@@ -122,7 +120,7 @@ class main_class:
         ind_failed=bestresponse.get_failed_ind()
 
         if not loan:
-            plotter2.plot_decision_surface(f, title="FULL_INFO best responses on linear SVC decision boundary", X_shifted=x_test_shifted1, highlighted_ind_x=ind_failed)
+            plotter2.plot_decision_surface(f, title=f"FULL_INFO best responses on {args.model_type.upper()} decision boundary", X_shifted=x_test_shifted1, highlighted_ind_x=ind_failed)
 
         ## check people who changed:
         x_changes=bestresponse.find_differences()
@@ -162,7 +160,7 @@ class main_class:
         x_test_shifted2=Lime.algorithm3(f, 0.4, self.alpha, self.eps, mod_type=model_type)
 
         if not loan:
-            plotter2.plot_decision_surface(f, title="PART_INFO best responses with linear SVC decision boundary",
+            plotter2.plot_decision_surface(f, title=f"PART_INFO best responses with {args.model_type.upper()} decision boundary",
                                        X_shifted=x_test_shifted2)
 
         x_changes2 = Lime.find_differences()
@@ -194,12 +192,12 @@ class main_class:
         # 3.1. NO INFORMATION - UTILITY MAXIMIZATION
         sigma = 1.0  # Bandwidth parameter for weigthed sampling
 
-        alg4=NoInformation(x_test, self.strat_features, self.alpha,  self.eps, y_test=y_train, plotting_ind=1)
+        alg4=NoInformation(x_test, self.strat_features, self.alpha,  self.eps, y_test=y_train, plotting_ind=43)
 
         x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, int(self.n/100), self.t, threshold=self.threshold)
 
         if not loan:
-            plotter2.plot_decision_surface(f, title="NO_INFO_EST best responses on linear SVC decision boundary", X_shifted=x_test_shifted3)
+            plotter2.plot_decision_surface(f, title=f"NO_INFO_EST best responses on {args.model_type.upper()} decision boundary", X_shifted=x_test_shifted3)
 
         x_changes3=alg4.find_differences()
         costs3 = alg4.get_costs()
@@ -207,6 +205,7 @@ class main_class:
 
         if not loan:
             alg4.plot_sample()
+            alg4.plot_sample(estimated=False, model_true=f)
 
         y_test_pred_shifted3=f.predict(x_test_shifted3)
         user_welfare_shift3=np.sum(y_test_pred_shifted3 == 1) / len(y_test_pred_shifted3) * 100
@@ -231,11 +230,11 @@ class main_class:
 
         # 3.2. NO INFORMATION - IMITATION
         alg4 = NoInformation(x_test, self.strat_features, self.alpha, self.eps, plotting_ind=1)
-        x_test_shifted4=alg4.algorithm4_imitation(x_train,y_train_pred, sigma, 50, 2*self.t, f=f)
+        x_test_shifted4=alg4.algorithm4_imitation(x_train,y_train_pred, sigma, int(self.n/100), 2*self.t)
 
         if not loan:
-            plotter2.plot_decision_surface(f, title="NO_INFO_IMIT best responses on linear SVC decision boundary", X_shifted=x_test_shifted4)
-            alg4.plot_sample()
+            plotter2.plot_decision_surface(f, title=f"NO_INFO_IMIT best responses on {args.model_type.upper()} decision boundary", X_shifted=x_test_shifted4)
+            #alg4.plot_sample()
 
         x_changes4=alg4.find_differences()
         costs4 = alg4.get_costs()
@@ -250,7 +249,7 @@ class main_class:
 
         print("--")
         print("--3.2. No information, imitation--")
-        print("Number of users who changed:", len(x_changes4), " in %:", len(x_changes4)/len(x_test)*100, "%")
+        print("Number of users who changed:", len(x_changes4), ", in %:", len(x_changes4)/len(x_test)*100, "%")
         print("Average cost of change: ", avg_cost4)
         print("Accuracy after the shift:", test_accuracy_shift4*100, "%")
         #print("Social welfare after shift:", social_welfare_shift1, "%")
@@ -263,8 +262,28 @@ class main_class:
 
         # Find indices where not all match (i.e., where the condition is False)
         indices_not_matching = np.where(~all_match)[0]
+
+        # Check it also for pairs with full info:
+        sc2=100 * len(np.where(~(y_test_pred_shifted1 == y_test_pred_shifted2))[0]) / len(y_test_pred_shifted1)
+        sc3 = 100 * len(np.where(~(y_test_pred_shifted1 == y_test_pred_shifted3))[0]) / len(y_test_pred_shifted1)
+        sc4 = 100 * len(np.where(~(y_test_pred_shifted1 == y_test_pred_shifted4))[0]) / len(y_test_pred_shifted1)
+
         print("--")
-        print("The size of the enlargement set:", len(indices_not_matching), "%:", len(indices_not_matching)/len(y_test_pred_shifted4))
+        print("The size of the enlargement set:", len(indices_not_matching), "in %:", 100*len(indices_not_matching)/len(y_test_pred_shifted4))
+        print("Pairwise enlargement sets: ",
+              "Full and LIME", sc2,
+              "Full and PART_EST", sc3,
+              "Full and PART_IMIT", sc4)
+        print("2* Error(f, f) in %:", 200 * (1 - test_accuracy_shift1))
+
+        if sc2>200 * (1 - test_accuracy_shift1):
+            print("Sufficient condition is true for Full Info & LIME, POP should be positive!")
+        if sc3>200 * (1 - test_accuracy_shift1):
+            print("Sufficient condition is true for Full Info & NO_INFO_EST, POP should be positive!")
+        if sc4>200 * (1 - test_accuracy_shift1):
+            print("Sufficient condition is true for Full Info & NO_INFO_IMIT, POP should be positive!")
+
+
 
         # Create table overview:
         index_labels = [
@@ -277,10 +296,10 @@ class main_class:
         ]
         data = {
             "Original": [test_accuracy*100, user_welfare, social_welfare, None, None, None],
-            "FULL\_INF": [test_accuracy_shift1*100, user_welfare_shift1, None, len(x_changes)/len(x_test)*100, avg_cost, avg_cont_payoff],
-            "PART\_INF": [test_accuracy_shift2*100, user_welfare_shift2, None, len(x_changes2)/len(x_test)*100, avg_cost2, avg_cont_payoff2],
-            "NO\_INF_EST": [test_accuracy_shift3*100, user_welfare_shift3, None, len(x_changes3)/len(x_test)*100, avg_cost3, avg_cont_payoff3],
-            "NO\_INF_IMIT": [test_accuracy_shift4*100, user_welfare_shift4, None, len(x_changes4)/len(x_test)*100, avg_cost4, avg_cont_payoff4]
+            "FULL\_INFO": [test_accuracy_shift1*100, user_welfare_shift1, None, len(x_changes)/len(x_test)*100, avg_cost, avg_cont_payoff],
+            "PART\_INFO": [test_accuracy_shift2*100, user_welfare_shift2, None, len(x_changes2)/len(x_test)*100, avg_cost2, avg_cont_payoff2],
+            "NO\_INFO_\EST": [test_accuracy_shift3*100, user_welfare_shift3, None, len(x_changes3)/len(x_test)*100, avg_cost3, avg_cont_payoff3],
+            "NO\_INFO_\IMIT": [test_accuracy_shift4*100, user_welfare_shift4, None, len(x_changes4)/len(x_test)*100, avg_cost4, avg_cont_payoff4]
         }
         df = pd.DataFrame(data, index=index_labels)
 
@@ -300,7 +319,7 @@ class main_class:
 
             # Define the configurations for the plots
             plots = [
-                {"plotter": plotter1, "title": "Original TRAINING data with trained decision boundary", "data": None, "x_points": None},
+                {"plotter": plotter1, "title": f"Original TRAINING data with trained {args.model_type.upper()} decision boundary", "data": None, "x_points": None},
                 {"plotter": plotter2, "title": "1: FULL_INFO best responses",
                  "data": x_test_shifted1, "x_points": ind_failed},
                 {"plotter": plotter2, "title": "3.1: NO_INFO_EST best responses",
@@ -353,25 +372,33 @@ class main_class:
             m_list = [4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
         else:
             m_list = [4, 8, 16, 32, 64, 128, 256, 512, 1024]
-        # 3.1. NO INFORMATION - UTILITY MAXIMIZATION with different sample sizes
+        # 3.1. NO INFORMATION -
         sigma = 1.0  # Bandwidth parameter for weigthed sampling
         y_train_pred=self.initial_model.predict(self.x_train)
 
         alg4=NoInformation(self.x_test, self.strat_features, self.alpha,  self.eps)
         errors_pop=[]
+        errors_pop2 = []
         for m in m_list:
+            # UTILITY MAXIMIZATION with different sample sizes
             x_test_shifted3=alg4.algorithm4_utility(self.x_train, y_train_pred, sigma, int(m), 2*self.t, threshold=self.threshold )
             y_test_pred_shifted3=self.initial_model.predict(x_test_shifted3)
             errors_pop.append(100-accuracy_score(self.y_test, y_test_pred_shifted3)*100)
-        plt.plot(m_list, errors_pop, label="NO_INF_EST")
+
+            # IMITATION with different sample sizes
+            x_test_shifted3 = alg4.algorithm4_imitation(self.x_train, y_train_pred, sigma, int(m), 2 * self.t)
+            y_test_pred_shifted3 = self.initial_model.predict(x_test_shifted3)
+            errors_pop2.append(100 - accuracy_score(self.y_test, y_test_pred_shifted3) * 100)
+        plt.plot(m_list, errors_pop, label="NO_INFO_EST")
+        plt.plot(m_list, errors_pop2, label="NO_INFO_IMIT")
 
         # fully informed case:
-        error_full = 100-self.results["FULL\_INF"]["Accuracy"]
+        error_full = 100-self.results["FULL\_INFO"]["Accuracy"]
         error_non = 100-self.results["Original"]["Accuracy"]
-        error_part=100-self.results["PART\_INF"]["Accuracy"]
+        error_part=100-self.results["PART\_INFO"]["Accuracy"]
         plt.axhline(y=error_non, color='red', linestyle='--', label="Non-strategic")
-        plt.axhline(y=error_full, color='blue', linestyle='-', label="FULL_INF")
-        plt.axhline(y=error_part, color='orange', linestyle=':',  label="PART_INF")
+        plt.axhline(y=error_full, color='blue', linestyle='-', label="FULL_INFO")
+        plt.axhline(y=error_part, color='orange', linestyle=':',  label="PART_INFO")
 
         plt.fill_between(
             m_list,  # x values (indices of accuracies_pop)
@@ -402,12 +429,13 @@ class main_class:
 
         plt.xlabel("m (sample size)")
         plt.ylabel("Error [%]")
-        plt.title("Errors in different information scenarios")
+        plt.title(f"Errors in different information scenarios for {args.model_type.upper()} model")
         plt.legend()
 
         plt.xscale("log")
 
         plt.xlim(m_list[0], m_list[-1])
+        plt.ylim(15,50)
 
         plt.savefig(f"outputs/{dataset_name}_{plotname2}.pdf")
 

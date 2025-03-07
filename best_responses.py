@@ -181,7 +181,7 @@ class NoInformation:
 
             # They best respond as if the estimated model would be the full information model:
             bestresponse_sample=Fullinformation(x.reshape(1, -1), self.strat_features)
-            x_shift = bestresponse_sample.algorithm2(self.alpha, f_est, t, self.eps, mod_type="dec_f", threshold=threshold)
+            x_shift = bestresponse_sample.algorithm2(self.alpha, f_est, t, self.eps, mod_type="dec_f", threshold=1e-06) # as it is always a linear model threshhold it set to this constant
 
             # Save the results:
             x_shifted[ind,]=x_shift[0]
@@ -191,7 +191,8 @@ class NoInformation:
             #Save results for plotting:
             if ind==self.plotting_ind:
                 self.x_plotting = np.vstack((x, T_c))
-                self.y_plotting = self.y_test[np.hstack((ind, ind_c))]
+                self.y_plotting = np.vstack((y_pred_est[ind], y_c))
+                self.y_plotting_true = self.y_test[np.hstack((ind, ind_c))]
                 self.model_plotting = f_est
                 self.x_shifted_plotting=np.vstack((x_shift[0], T_c))
 
@@ -228,7 +229,7 @@ class NoInformation:
         elif beta_1 > 0: # otherwise take biggest change possible
             return min(beta_1, 1)
 
-    def algorithm4_imitation(self, X_train, y_train_pred, sigma,m, t, f=None):
+    def algorithm4_imitation(self, X_train, y_train_pred, sigma,m, t):
         ws = WeightedSampler(X_train, sigma, y_train_pred)
         cost_func = MixWeightedLinearSumSquareCostFunction(self.alpha, self.eps)
         n = (self.X_test.shape[0])
@@ -254,7 +255,6 @@ class NoInformation:
             if ind==self.plotting_ind:
                 self.x_plotting = np.vstack((x, T_c))
                 self.y_plotting = y_train_pred[np.hstack((ind, ind_c))]
-                self.model_plotting = f
                 self.x_shifted_plotting=np.vstack((x_shifted[0], T_c))
 
         self.costs=np.copy(costs)
@@ -281,11 +281,16 @@ class NoInformation:
         # Returns the estimated model outcome of the users after the shift
         return self.y_pred_est_after
 
-    def plot_sample(self):
+    def plot_sample(self, estimated=True, model_true=None):
         if self.plotting_ind==None:
             raise ValueError("Plotting index is none. If plotting is requested, choose an index of the test set.")
-        plotter=ClassifierPlotter(self.x_plotting,self.y_plotting)
-        plotter.plot_decision_surface(self.model_plotting, X_shifted=self.x_shifted_plotting, highlighted_ind_circle=0)
+        if estimated:
+            plotter=ClassifierPlotter(self.x_plotting,self.y_plotting.ravel())
+            plotter.plot_decision_surface(self.model_plotting, title=f"Plot of decision surface for sample of instance {self.plotting_ind}.\nLabels: predicted labels by f, model: estimated model of user", X_shifted=self.x_shifted_plotting, highlighted_ind_circle=0)
+        else:
+            plotter = ClassifierPlotter(self.x_plotting, self.y_plotting_true)
+            plotter.plot_decision_surface(model_true, title=f"Plot of decision surface for sample of instance {self.plotting_ind}.\nLabels: true labels, model: true f model", X_shifted=self.x_shifted_plotting,
+                                          highlighted_ind_circle=0)
 
 class PartialInformation:
     def __init__(self, x_train, x_test, strat_features):
