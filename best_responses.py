@@ -1,5 +1,3 @@
-# TO-DO: apply strategic features everywhere!
-
 import numpy as np
 from scipy.optimize import minimize, NonlinearConstraint
 from cost_functions import MixWeightedLinearSumSquareCostFunction
@@ -151,6 +149,24 @@ class Fullinformation:
 
 
 class NoInformation:
+    """Best response function for agents given classifier in a no information scenario.
+
+    Parameters
+    ----------
+    X_test: np.array
+        test data matrix
+    strat_features: list
+        list of feature indices that can be manipulated strategically, other features remain fixe
+    alpha: list
+        cost vector
+    eps: float
+        the weight of the quadratic element in the cost function
+    y_test: np.array
+        target labels of test data
+    plotting_ind: int
+        the index where the data story should be plotted
+    """
+
     def __init__(self, X_test, strat_features, alpha, eps, y_test=None, plotting_ind=None):
         self.X_test = X_test
         self.strat_features = strat_features
@@ -159,7 +175,20 @@ class NoInformation:
         self.y_test=y_test
         self.plotting_ind=plotting_ind
 
-    def algorithm4_utility(self, X_train, y_train_pred, sigma,m, t, threshold):
+    def algorithm4_utility(self, X_train, y_train_pred, sigma,m, t):
+        """ finds optimal response for the agent with no information and sampling
+        X_train: np.array
+            training data matrix
+        y_train_pred: np.array
+            predicted labels of model on the training data
+        sigma: float
+            bandwith parameter for Gaussian sampling
+        m: int
+            sample size per user
+        t: float
+            budget for changes, only changes with a cost below 2t are made
+        """
+
         ws = WeightedSampler(X_train, sigma, y_train_pred) # initialize weighted sampler
         n = (self.X_test.shape[0])
         dim = (self.X_test.shape[1])
@@ -230,6 +259,18 @@ class NoInformation:
             return min(beta_1, 1)
 
     def algorithm4_imitation(self, X_train, y_train_pred, sigma,m, t):
+        """ finds optimal response for the agent with no information and imitation
+        X_train: np.array
+            training data matrix
+        y_train_pred: np.array
+            predicted labels of model on the training data
+        sigma: float
+            bandwith parameter for Gaussian sampling
+        m: int
+            sample size per user
+        t: float
+            budget for changes, only changes with a cost below 2t are made
+        """
         ws = WeightedSampler(X_train, sigma, y_train_pred)
         cost_func = MixWeightedLinearSumSquareCostFunction(self.alpha, self.eps)
         n = (self.X_test.shape[0])
@@ -293,6 +334,15 @@ class NoInformation:
                                           highlighted_ind_circle=0)
 
 class PartialInformation:
+    """Best response function for agents given classifier in a PARTIAL information scenario.
+
+        Parameters
+        ----------
+        X_train: np.array
+            training data matrix
+        X_test: np.array
+            test data matrix
+        """
     def __init__(self, x_train, x_test, strat_features):
         self.X_train = x_train
         self.X_test=x_test
@@ -356,6 +406,26 @@ class PartialInformation:
         return parsed_output
 
     def algorithm3(self, f, threshold, alpha, epsilon, budget=2, mod_type="dec_f"):
+        """
+            Implements algorithm3 for shifting feature values based on LIME explanations to improve classification.
+
+            Args:
+                f: sklearn classifier
+                    The classification model used for predictions.
+                threshold: float
+                    Smallest probability threshold for classifying an instance as positive from user perspective.
+                alpha: list
+                    cost vector
+                epsilon: float
+                    the weight of the quadratic element in the cost function
+                budget: int
+                    Maximum cost the user can spend on feature changes. Defaults to 2.
+                mod_type: str
+                    Determines whether to use decision function ("dec_f") or `predict_proba`. Defaults to "dec_f".
+
+            Returns:
+                numpy.ndarray: The modified feature matrix (`X_shifted`) after adjustments.
+            """
         explainer = LimeTabularExplainer( # A lime explainer is trained on X_train
             training_data=self.X_train,
             feature_names=list(range(self.X_train.shape[1])),

@@ -24,9 +24,8 @@ import copy
 warnings.filterwarnings(action='ignore', category=DataConversionWarning)
 
 class main_class:
-    def __init__(self, dimension_number: int, n: int, t: float, eps : float) -> None:
-        self.dimension_number = dimension_number
-        self.t = t/5
+    def __init__(self, n: int, t: float, eps : float) -> None:
+        self.t = t  #/5
         self.eps = eps
         self.feature_names = ["Feature1", "Feature2"]
         self.n=n
@@ -34,12 +33,12 @@ class main_class:
 
     def info_comparison(self, moons: bool, loan: bool, model_type: str):
         if moons:
-            x_train, x_test, y_train, y_test = synth_data_moons(dimensions=self.dimension_number, random_seed=42,
+            x_train, x_test, y_train, y_test = synth_data_moons(dimensions=2, random_seed=42,
                                                       num_points=self.n)
             self.strat_features = np.array([0, 1])
             self.alpha = 0.5 * np.array([0.5, 0.5]).reshape(2,1)
         elif loan==False:
-            x_train, x_test, y_train, y_test = synth_data(dimensions=self.dimension_number, random_seed=42, num_points=int(self.n/2))
+            x_train, x_test, y_train, y_test = synth_data(dimensions=2, random_seed=42, num_points=int(self.n/2))
             self.strat_features = np.array([0, 1])
             self.alpha = np.array([0.5, 0.5]).reshape(2,1)
         else:
@@ -186,7 +185,7 @@ class main_class:
         #print("Social welfare after shift:", social_welfare_shift1, "%")
         print("User welfare after shift:", user_welfare_shift2, "%")
         print("Average contestant payoff:", avg_cont_payoff2)
-        print("The size of disagreement set:", size_of_dis_set_2, "%:", size_of_dis_set_2/len(y_test_pred_shifted2))
+        print("The size of disagreement set:", size_of_dis_set_2, "%:", size_of_dis_set_2/len(y_test_pred_shifted2)*100)
 
 
         # 3.1. NO INFORMATION - UTILITY MAXIMIZATION
@@ -194,7 +193,7 @@ class main_class:
 
         alg4=NoInformation(x_test, self.strat_features, self.alpha,  self.eps, y_test=y_train, plotting_ind=43)
 
-        x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, int(self.n/100), self.t, threshold=self.threshold)
+        x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, int(self.n/100), self.t)
 
         if not loan:
             plotter2.plot_decision_surface(f, title=f"NO_INFO_EST best responses on {args.model_type.upper()} decision boundary", X_shifted=x_test_shifted3)
@@ -226,7 +225,7 @@ class main_class:
         #print("Social welfare after shift:", social_welfare_shift1, "%")
         print("User welfare after shift:", user_welfare_shift3, "%")
         print("Average contestant payoff:", avg_cont_payoff3)
-        print("The size of disagreement set:", size_of_dis_set_3, "%:", size_of_dis_set_3/len(y_test_pred_shifted3))
+        print("The size of disagreement set:", size_of_dis_set_3, "%:", size_of_dis_set_3/len(y_test_pred_shifted3)*100)
 
         # 3.2. NO INFORMATION - IMITATION
         alg4 = NoInformation(x_test, self.strat_features, self.alpha, self.eps, plotting_ind=1)
@@ -292,14 +291,15 @@ class main_class:
             "Social welfare",
             "% of user changes",
             "Average cost of change per change",
-            "Average contestant payoff"
+            "Average contestant payoff",
+            "Size of disagreement set %"
         ]
         data = {
-            "Original": [test_accuracy*100, user_welfare, social_welfare, None, None, None],
-            "FULL\_INFO": [test_accuracy_shift1*100, user_welfare_shift1, None, len(x_changes)/len(x_test)*100, avg_cost, avg_cont_payoff],
-            "PART\_INFO": [test_accuracy_shift2*100, user_welfare_shift2, None, len(x_changes2)/len(x_test)*100, avg_cost2, avg_cont_payoff2],
-            "NO\_INFO_\EST": [test_accuracy_shift3*100, user_welfare_shift3, None, len(x_changes3)/len(x_test)*100, avg_cost3, avg_cont_payoff3],
-            "NO\_INFO_\IMIT": [test_accuracy_shift4*100, user_welfare_shift4, None, len(x_changes4)/len(x_test)*100, avg_cost4, avg_cont_payoff4]
+            "Original": [test_accuracy*100, user_welfare, social_welfare, None, None, None, None],
+            "FULL\_INFO": [test_accuracy_shift1*100, user_welfare_shift1, None, len(x_changes)/len(x_test)*100, avg_cost, avg_cont_payoff, None],
+            "PART\_INFO": [test_accuracy_shift2*100, user_welfare_shift2, None, len(x_changes2)/len(x_test)*100, avg_cost2, avg_cont_payoff2, size_of_dis_set_2/len(y_test_pred_shifted2)*100],
+            "NO\_INFO\_EST": [test_accuracy_shift3*100, user_welfare_shift3, None, len(x_changes3)/len(x_test)*100, avg_cost3, avg_cont_payoff3, size_of_dis_set_3/len(y_test_pred_shifted3)*100],
+            "NO\_INFO\_IMIT": [test_accuracy_shift4*100, user_welfare_shift4, None, len(x_changes4)/len(x_test)*100, avg_cost4, avg_cont_payoff4, None]
         }
         df = pd.DataFrame(data, index=index_labels)
 
@@ -308,7 +308,7 @@ class main_class:
         print(df)
 
         self.results=df
-        df.to_csv(f"outputs/{dataset_name}_{tablename}.csv", index=True, float_format='%.2f')
+        df.to_csv(f"outputs/{dataset_name}_{tablename}.csv", index=True, float_format='%.2f') #variations on cost budget/
 
         if not loan:
             # Create a 2x3 grid for the subplots
@@ -381,7 +381,7 @@ class main_class:
         errors_pop2 = []
         for m in m_list:
             # UTILITY MAXIMIZATION with different sample sizes
-            x_test_shifted3=alg4.algorithm4_utility(self.x_train, y_train_pred, sigma, int(m), 2*self.t, threshold=self.threshold )
+            x_test_shifted3=alg4.algorithm4_utility(self.x_train, y_train_pred, sigma, int(m), 2*self.t)
             y_test_pred_shifted3=self.initial_model.predict(x_test_shifted3)
             errors_pop.append(100-accuracy_score(self.y_test, y_test_pred_shifted3)*100)
 
@@ -435,7 +435,10 @@ class main_class:
         plt.xscale("log")
 
         plt.xlim(m_list[0], m_list[-1])
-        plt.ylim(15,50)
+        if loan:
+            plt.ylim(15,50)
+        else:
+            plt.ylim(5, 50)
 
         plt.savefig(f"outputs/{dataset_name}_{plotname2}.pdf")
 
@@ -445,11 +448,9 @@ class main_class:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dimension_number", type=int, default=2,
-                    help="Number of dimensions for synthetic data.")
     parser.add_argument("--n", type=int, default=1138,
                         help="Number of datapoints in total for synthetic data. 10% test, 90% training split.")
-    parser.add_argument("--t", type=float, default=1,
+    parser.add_argument("--t", type=float, default=0.2,
                         help="Controls the budget for changes. The higher t, the higher costs users are willing to pay.")
     parser.add_argument("--eps", type=float, default=0.2,
                         help="The weight of the quadratic element in the mixed cost function.")
@@ -483,7 +484,6 @@ if __name__ == "__main__":
     dataset_name= "loan" if args.loan else "moons" if args.moons else "circ"
 
     processor = main_class(
-        dimension_number=args.dimension_number,
         n=args.n,
         t=args.t,
         eps=args.eps,

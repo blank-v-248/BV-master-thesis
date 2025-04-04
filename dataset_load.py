@@ -5,6 +5,20 @@ from sklearn.datasets import make_moons
 import pandas as pd
 
 def synth_data(dimensions=2, num_points=100, random_seed=24):
+    """
+    Generates a synthetic dataset that has two gaussian clusters & splits it into training and testing sets.
+
+    Args:
+        dimensions (int): Number of features/dimensions (must be 2 for the moons dataset).
+        random_seed (int): Random seed for reproducibility.
+        num_points (int): Number of points per class.
+
+    Returns:
+        x_train (ndarray): Training features.
+        x_test (ndarray): Testing features.
+        y_train (ndarray): Training labels.
+        y_test (ndarray): Testing labels.
+    """
     if dimensions != 2:
         raise ValueError("Please choose a feasible number of dimensions (currently only 2 is supported).")
     else:
@@ -66,6 +80,18 @@ def synth_data_moons(dimensions, random_seed, num_points):
     return x_train, x_test, y_train, y_test
 
 def loan_data(train_val: bool = False):
+    """
+    Loads the loan dataset and splits it into training and testing sets.
+
+    Args:
+        train_val (bool): Whether the training set should include the validation set, default: False
+
+    Returns:
+        x_train (ndarray): Training features.
+        x_test (ndarray): Testing features.
+        y_train (ndarray): Training labels.
+        y_test (ndarray): Testing labels.
+    """
     six_most_significant_features = ['AvailableBankcardCredit', 'LoanOriginalAmount',
                                      'TradesNeverDelinquent(percentage)',
                                      'BankcardUtilization', 'TotalInquiries', 'CreditHistoryLength']

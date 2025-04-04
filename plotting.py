@@ -23,7 +23,30 @@ def difference_finder(X0, X1):
     return differing_indices
 
 class ClassifierPlotter:
+    """
+        A class for visualizing a 2D dataset with binary classification labels.
+
+        Attributes:
+            X (numpy.ndarray): Feature matrix of shape (n_samples, 2).
+            y (numpy.ndarray): Label array of shape (n_samples,).
+            feature_names (list): Names of the two features used for labeling axes.
+            unique_labels (numpy.ndarray): Unique labels present in the dataset.
+            label_to_color (dict): Mapping of class labels to colors.
+            x_lim (list): X-axis limits for the plot.
+            y_lim (list): Y-axis limits for the plot.
+        """
+
     def __init__(self, X, y, feature_names=["Feature 1", "Feature 2"], x_lim=[-3,3], y_lim=[-3,3]):
+        """
+               Initializes the ClassifierPlotter with dataset and visualization settings.
+
+               Args:
+                   X (numpy.ndarray): Feature matrix of shape (n_samples, 2).
+                   y (numpy.ndarray): Label array of shape (n_samples,).
+                   feature_names (list, optional): Names of the two features. Defaults to ["Feature 1", "Feature 2"].
+                   x_lim (list, optional): X-axis limits for the plot. Defaults to [-3, 3].
+                   y_lim (list, optional): Y-axis limits for the plot. Defaults to [-3, 3].
+        """
         self.X = X
         self.y = y
         self.feature_names=feature_names
