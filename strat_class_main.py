@@ -1,10 +1,5 @@
-# NO IMPROVEMENT IS ALLOWED YET/NO GROUND TRUTH
-
-import numpy as np
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import argparse
-import pandas as pd
 
 from best_responses import *
 from plotting import *
@@ -14,7 +9,6 @@ from weightedsampler import *
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
-
 
 import warnings
 from sklearn.exceptions import DataConversionWarning
@@ -191,7 +185,7 @@ class main_class:
         # 3.1. NO INFORMATION - UTILITY MAXIMIZATION
         sigma = 1.0  # Bandwidth parameter for weigthed sampling
 
-        alg4=NoInformation(x_test, self.strat_features, self.alpha,  self.eps, y_test=y_train, plotting_ind=43)
+        alg4=NoInformation(x_test, self.strat_features, self.alpha,  self.eps, y_test=y_train, plotting_ind=args.plotting_ind)
 
         x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, int(self.n/100), self.t)
 
@@ -461,6 +455,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("--loan", action="store_true",
                         help="If set, the loans dataset is used. Otherwise, a synthetic dataset is used.")
+    parser.add_argument("--plotting_ind", type=int, default=43,
+                        help="For the synthetic datasets this parameter chooses the index of the individual in the data stories.")
 
     args = parser.parse_args()
 
@@ -482,6 +478,20 @@ if __name__ == "__main__":
         plotname2 = "lin_pop"
         tablename = "lin"
     dataset_name= "loan" if args.loan else "moons" if args.moons else "circ"
+
+    # Updating s.t. if it is varied in epsilon and t, it is saved to a new folder
+    if args.eps != 0.2:
+        dataset_name = "variations/" + dataset_name
+        eps_str = str(args.eps).replace(".", "_")
+        plotname1 += f"_{eps_str}"
+        plotname2 += f"_{eps_str}"
+        tablename += f"_{eps_str}"
+    if args.t != 0.2:
+        dataset_name = "variations/" + dataset_name
+        t_str = str(args.t).replace(".", "_")
+        plotname1 += f"_{t_str}"
+        plotname2 += f"_{t_str}"
+        tablename += f"_{t_str}"
 
     processor = main_class(
         n=args.n,
