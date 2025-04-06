@@ -33,11 +33,17 @@ For that you can use following lines:
 
 ### Experiments on synthetic data
 To create the figures and tables in Section 6.1, you can run following lines:
+  
       python strat_class_main.py
+  
       python strat_class_main.py --moons
+  
       python strat_class_main.py --moons --model_type nn
+  
       python strat_class_main.py --moons --model_type rnf
+  
       python strat_class_main.py --moons --model_type knn
+      
 <img alt="prosper" src="./images/moons_lin.png" width="400" height="300"/>
 
 For the **data stories**, following parameters were selected:
