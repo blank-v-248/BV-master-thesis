@@ -35,7 +35,6 @@ For that you can use following lines:
 To create the figures and tables in Section 6.1, you can run following lines:
   
       python strat_class_main.py
-  
       python strat_class_main.py --moons
   
       python strat_class_main.py --moons --model_type nn
