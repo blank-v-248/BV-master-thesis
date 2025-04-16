@@ -6,6 +6,8 @@ from sklearn.svm import LinearSVC
 from lime.lime_tabular import LimeTabularExplainer
 from plotting import *
 import cvxpy as cp
+import warnings
+from tqdm import tqdm
 
 def difference_finder(X0, X1):
     """
@@ -35,7 +37,7 @@ class Fullinformation:
     Parameters
     ----------
     X: np.array
-        training data matrix
+        test data matrix
     strat_features: list
         list of feature indices that can be manipulated strategically, other features remain fixed
     """
@@ -44,7 +46,7 @@ class Fullinformation:
         self.X = X
         self.strat_features = strat_features
 
-    def algorithm2(self, alpha, model, t=1, epsilon=0, mod_type="dec_f", threshold=0.5, use_cp=False):
+    def algorithm2(self, alpha, model, t=1, epsilon=0, mod_type="dec_f", threshold=0.5, use_cp=False, positive_instances=None):
         ### finds optimal response for the agent given a classifier and costs
         # alpha: cost vector of changing the features
         # model: classifier that has either a .decision_function or a .predict_proba option
@@ -52,15 +54,18 @@ class Fullinformation:
         # epsilon: the weight of the quadratic term in the mixed cost function, should be between 0 and 1
         # mod_type: what argument the model has that returns a continous
         # threshold: the threshold of the model over which it predicts +1
+        # positive instances: a matrix of positive instances in the training data
 
         n = self.X.shape[0]
         m = len(self.strat_features)
         X_strat = np.copy(self.X)
+
         self.costs = np.zeros(n)
         index_of_failed_opt=[]
         cp_vs_scipy=[]
 
-        for i in range(n): #iterate over all instances
+        #for i in tqdm(range(n), desc="Finding instances' best response"):
+        for i in range(n):
             if model.predict(X_strat[i,].reshape(1, -1)) != 1:  # people only change, if they get predicted as -1
                 x0_strat = X_strat[i, self.strat_features]  # these are the features that agent can change
                 # Define the cost function by class:
@@ -88,28 +93,73 @@ class Fullinformation:
                 ]
 
                 # Solve the optimization problem with scipy minimize, equation 4:
-                result = minimize(objective, x0_strat, constraints=cons_equations,  tol= 1e-8, options={"maxiter": 1000}, method="SLSQP") #method="trust-constr", "COBLYA" SLSQP
+                # find initial point as closest pos instance:
+                dists = np.linalg.norm(positive_instances - x0_strat, axis=1)
+                sorted_indices = np.argsort(dists)
+                ordered_pos_instances = positive_instances[sorted_indices]
+                x_init=ordered_pos_instances[0]
+
+
+                result = minimize(objective, x_init, constraints=cons_equations, tol=1e-12,
+                                  options={'maxiter': 100, 'gtol': 1e-10, 'xtol': 1e-10, 'barrier_tol': 1e-10},
+                                  method="trust-constr")  # method="trust-constr", "COBLYA" SLSQP
+                # options={'gtol': 1e-6, 'xtol': 1e-10, 'barrier_tol': 1e-8}
 
                 if use_cp:
                     x_t = cp.Variable(len(x0_strat))
-                    func_to_solve = cp.Minimize(cp.maximum((1 - epsilon) * alpha.T @ (x_t - x0_strat), 0) + epsilon *cp.sum((x_t - x0_strat) ** 2))
+                    func_to_solve = cp.Minimize(
+                        cp.maximum((1 - epsilon) * alpha.T @ (x_t - x0_strat), 0) + epsilon * cp.sum(
+                            (x_t - x0_strat) ** 2))
                     constrains = [x_t @ model.coef_[0] >= -model.intercept_ + threshold]
 
                     prob = cp.Problem(func_to_solve, constrains)
                     prob.solve()
-                    opt_strat_x_cp=x_t.value
+                    opt_strat_x_cp = x_t.value
 
-                # Check if the optimization was successful
-                if result.success:
-                    opt_strat_x = result.x #.reshape(1, m)
-                    assert model.predict(opt_strat_x.reshape(1, -1)) == 1, f"Change happening, however prediction not worthwile! Problematic index: {i}"
+                if not result.success:
+                    import IPython
+                    # IPython.embed()
+
+                    # Check if the optimization was successful
+                if result.constr_violation == 0.:  # result.success:
+                    opt_strat_x = result.x  # .reshape(1, m)
+                    if model.predict(opt_strat_x.reshape(1, -1)) == 0:
+                        print("infeasible point")
+                        import IPython
+                        # IPython.embed()
+                        opt_strat_x = np.array(x_init)
+                    assert model.predict(opt_strat_x.reshape(1,
+                                                             -1)) == 1, f"Change happening, however prediction not worthwile! Problematic index: {i}"
                 else:
-                    opt_strat_x = x0_strat  # Retain the original x0_strat
-                    index_of_failed_opt.append(i)
+                    #print("Optimization 1 round failed")
 
-                if use_cp:
-                    cp_vs_scipy.append(np.allclose(opt_strat_x, opt_strat_x_cp, atol=1e-2))
-                    opt_strat_x = np.copy(opt_strat_x_cp)
+                    max_iter = 10
+                    found_solution = False
+
+                    for k in range(1, max_iter):
+                        x_init2 = ordered_pos_instances[k*10]
+
+                        result2 = minimize(
+                            objective,
+                            x_init2,
+                            constraints=cons_equations,
+                            tol=1e-12,
+                            options={'maxiter': 100, 'gtol': 1e-10, 'xtol': 1e-10, 'barrier_tol': 1e-10},
+                            method="trust-constr"
+                        )
+
+                        if result2.constr_violation == 0.:  # You can also use result2.success if preferred
+                            opt_strat_x = result2.x
+                            found_solution = True
+                            break
+                        #else:
+                            #print(f"Optimization round {k}. failed")
+
+                    if not found_solution:
+                        #print(f"Optimization completely failed, total attempts: {max_iter}")
+                        opt_strat_x = x0_strat  # Retain the original x0_strat
+                        index_of_failed_opt.append(i)
+
 
                 # Get the cost of optimal value:
                 self.costs[i] = cost_func(opt_strat_x, x0_strat)
@@ -210,12 +260,23 @@ class NoInformation:
 
             # They best respond as if the estimated model would be the full information model:
             bestresponse_sample=Fullinformation(x.reshape(1, -1), self.strat_features)
-            x_shift = bestresponse_sample.algorithm2(self.alpha, f_est, t, self.eps, mod_type="dec_f", threshold=1e-06) # as it is always a linear model threshhold it set to this constant
 
+            # the positive instances from the sample are used for finding good initial point for optimisation:
+            T_c_pred_plus = T_c[f_est.predict(T_c) == 1]
+            # if there are no points in the sample, try to find random good point:
+            if T_c_pred_plus.shape[0] == 0:
+                T_c_pred_plus = find_closest_positive_sample(x, f_est, iteration=ind)
+            if T_c_pred_plus.shape[0] == 0: # if no feasible solutions are found as initial starting point, retain features
+                x_shifted[ind,] = x
+                costs[ind]=0
+            else:
+                x_shift = bestresponse_sample.algorithm2(self.alpha, f_est, t, self.eps, mod_type="dec_f", threshold=1e-06, positive_instances=T_c_pred_plus) # as it is always a linear model threshhold it set to this constant
+                x_shifted[ind,] = x_shift[0]
+                costs[ind] = bestresponse_sample.get_costs()
             # Save the results:
             x_shifted[ind,]=x_shift[0]
             y_pred_est_after[ind]=f_est.predict(x_shifted[ind].reshape(1, -1))
-            costs[ind]=bestresponse_sample.get_costs()
+
 
             #Save results for plotting:
             if ind==self.plotting_ind:
@@ -532,6 +593,52 @@ class PartialInformation:
     def est_pred_after(self):
         # Returns the estimated model outcome of the users after the shift
         return self.y_pred_est_after
+
+import numpy as np
+
+def find_closest_positive_sample(x, f_est, cov_scale=2.5, max_attempts=1000, seed=42, iteration=None):
+    """
+    Samples from a Gaussian centered at x until it finds at least one sample
+    with a positive prediction from f_est. It returns the closest such sample to x.
+
+    Parameters:
+    - x: np.ndarray, the center of the Gaussian
+    - f_est: a model with a .predict() method
+    - cov_scale: float, scaling factor for the covariance matrix
+    - max_attempts: int, maximum total samples to try
+    - seed: int or None, seed for reproducibility
+    - iteration: iteration for debugging purposes
+
+    Returns:
+    - np.ndarray of shape (1, len(x)), the closest positively predicted sample
+    - int, total number of iterations performed
+    """
+    if seed is not None:
+        np.random.seed(seed)
+
+    it = 0
+    while it < max_attempts:
+        samples = []
+        dists = []
+
+        for _ in range(10):
+            sample = np.random.multivariate_normal(mean=x, cov=np.eye(len(x)) * cov_scale)
+            pred = f_est.predict(sample.reshape(1, -1))[0]
+            it += 1
+
+            if pred == 1:
+                samples.append(sample)
+                dists.append(np.linalg.norm(sample - x))
+
+        if samples:
+            min_idx = np.argmin(dists)
+            return samples[min_idx].reshape(1, -1)
+
+    warnings.warn(
+        f"Closest positive sample found was too far from x."
+    )
+    return np.empty((0, x.shape[0]))
+
 
 
 

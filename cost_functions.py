@@ -1,50 +1,9 @@
 import numpy as np
-from abc import ABC, abstractmethod
 
 #Source: https://github.com/staretgicclfdark/strategic_rep
 
-class CostFunction(ABC):
-    """
-       Abstract base class for cost functions used in strategic classification.
 
-       Methods:
-           __call__(z: np.array, x: np.array) -> float:
-               Computes the cost of transforming feature vector x into z.
-
-           maximize_features_against_binary_model(x: np.array, trained_model, use_spare_cost: bool = False) -> np.array:
-               Finds a modified feature vector that minimizes cost while ensuring a positive classification score.
-       """
-
-    @abstractmethod
-    def __call__(self, z: np.array, x: np.array):
-        """
-        Computes the cost required for a player to transition from feature vector x to z.
-
-        Args:
-            z (np.array): Desired feature vector.
-            x (np.array): Current feature vector.
-
-        Returns:
-            float: The cost incurred for modifying x into z.
-        """
-
-        pass
-
-    def maximize_features_against_binary_model(self, x: np.array, trained_model, use_spare_cost=False):
-        """
-        Finds the optimal feature vector with minimal cost that achieves a positive score in a binary classification model.
-
-        Args:
-            x (np.array): Current feature vector.
-            trained_model: A trained binary classification model.
-            use_spare_cost (bool, optional): If True, allows for additional cost expenditure to improve classification score.
-
-        Returns:
-            np.array: A feature vector with the lowest cost that achieves a positive classification.
-        """
-        pass
-
-class MixWeightedLinearSumSquareCostFunction(CostFunction):
+class MixWeightedLinearSumSquareCostFunction():
     """
     Cost function combining a weighted linear component and a squared L2 norm penalty.
 

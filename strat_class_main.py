@@ -16,6 +16,23 @@ import copy
 
 # Suppress the specific warning
 warnings.filterwarnings(action='ignore', category=DataConversionWarning)
+warnings.filterwarnings(
+    "ignore",
+    message="delta_grad == 0.0. Check if the approximated function is linear.*",
+    category=UserWarning,
+    module="scipy.optimize._hessian_update_strategy"
+)
+warnings.filterwarnings(
+        "ignore",
+        message="Singular Jacobian matrix. Using SVD decomposition to perform the factorizations.",
+        category=UserWarning
+    )
+warnings.filterwarnings(
+        "ignore",
+        message=".*the default value of `keepdims` will become False.*",
+        category=FutureWarning
+    )
+
 
 class main_class:
     def __init__(self, n: int, t: float, eps : float) -> None:
@@ -37,6 +54,8 @@ class main_class:
             self.alpha = np.array([0.5, 0.5]).reshape(2,1)
         else:
             x_train, x_test, y_train, y_test = loan_data(train_val=True)
+            x_test = x_test[:500]
+            y_test = y_test[:500]
             self.strat_features = np.array([0, 1, 2, 3, 4, 5])
             self.alpha = 0.5 * np.array([0.5, 0.5, 1.5, -2.5, -0.5, 0.5]).reshape(6, 1)
 
@@ -101,8 +120,11 @@ class main_class:
         model_type = "dec_f" if model_type=="linear" else "pred_proba"
 
         # 1. FULL INFORMATION
+        # positive instances for initialization:
+        X_train_pred_plus_sample = x_train[y_train_pred==1]#[:10]
+
         bestresponse=Fullinformation(x_test, self.strat_features.tolist())
-        x_test_shifted1 = bestresponse.algorithm2(self.alpha, f, self.t, self.eps, mod_type=model_type, threshold= self.threshold) #add a small threshhold to make it positive for sure
+        x_test_shifted1 = bestresponse.algorithm2(self.alpha, f, self.t, self.eps, mod_type=model_type, threshold= self.threshold, positive_instances=X_train_pred_plus_sample) #add a small threshhold to make it positive for sure
 
         #checking if they are orthogonal:
         if model_type=="linear":
@@ -145,6 +167,7 @@ class main_class:
         print("Accuracy after the shift:", test_accuracy_shift1*100, "%")
         #print("Social welfare after shift:", social_welfare_shift1, "%")
         print("User welfare after shift:", user_welfare_shift1, "%")
+        print("Total number of failed optimisation: ", len(ind_failed))
 
         # 2. PARTIAL INFORMATION - LIME
         # Create a LIME explainer
@@ -187,7 +210,7 @@ class main_class:
 
         alg4=NoInformation(x_test, self.strat_features, self.alpha,  self.eps, y_test=y_train, plotting_ind=args.plotting_ind)
 
-        x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, int(self.n/100), self.t)
+        x_test_shifted3=alg4.algorithm4_utility(x_train, y_train_pred, sigma, int(self.n/75), self.t)
 
         if not loan:
             plotter2.plot_decision_surface(f, title=f"NO_INFO_EST best responses on {args.model_type.upper()} decision boundary", X_shifted=x_test_shifted3)
@@ -374,6 +397,8 @@ class main_class:
         errors_pop=[]
         errors_pop2 = []
         for m in m_list:
+            if loan:
+                print(f"Starting sample size m= {m}")
             # UTILITY MAXIMIZATION with different sample sizes
             x_test_shifted3=alg4.algorithm4_utility(self.x_train, y_train_pred, sigma, int(m), 2*self.t)
             y_test_pred_shifted3=self.initial_model.predict(x_test_shifted3)
@@ -431,6 +456,7 @@ class main_class:
         plt.xlim(m_list[0], m_list[-1])
         if loan:
             plt.ylim(15,50)
+            #plt.ylim(15, 100)
         else:
             plt.ylim(5, 50)
 
