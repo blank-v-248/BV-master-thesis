@@ -45,7 +45,8 @@ To create the figures and tables in Section 6.1, you can run following lines:
 For the **data stories**, following parameters were selected:
   
       python strat_class_main.py --moons --model_type nn --plotting_ind 1
-      python strat_class_main.py --moons --model_type nn --plotting_ind 43
+      python strat_class_main.py --moons --model_type nn --plotting_ind 27
+      python strat_class_main.py --moons --model_type nn --plotting_ind 60
 
       
 <div style="text-align: center;">
